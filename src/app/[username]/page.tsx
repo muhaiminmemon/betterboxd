@@ -7,11 +7,9 @@ import { getSessionUser } from "@/lib/auth";
 import { getRankedLibrary } from "@/lib/library";
 import { formatTenths } from "@/lib/format";
 import { areFriends, canViewProfile, isBlockedBetween } from "@/lib/social";
-import LibraryView from "@/components/LibraryView";
 import ProfileActions, { type Relationship } from "@/components/ProfileActions";
 import Avatar from "@/components/Avatar";
-import ProfileDiaryList from "@/components/ProfileDiaryList";
-import ProfileWatchlistList from "@/components/ProfileWatchlistList";
+import ProfileTabs from "@/components/ProfileTabs";
 
 export async function generateMetadata(ctx: { params: Promise<{ username: string }> }) {
   const { username } = await ctx.params;
@@ -112,8 +110,8 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
           ),
         )
         .orderBy(sql`${diaryEntries.watchedOn} desc nulls last`, desc(diaryEntries.createdAt))
-        .limit(12)
-    : [];
+        .limit(1000)
+    : null;
 
   const watchlistRows = showWatchlist
     ? await db
@@ -129,8 +127,7 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
         .innerJoin(films, eq(films.id, watchlist.filmId))
         .where(eq(watchlist.userId, profile.id))
         .orderBy(desc(watchlist.createdAt))
-        .limit(12)
-    : [];
+    : null;
 
   return (
     <div>
@@ -164,42 +161,12 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
         </div>
       </div>
 
-      {diaryRows.length > 0 && (
-        <section className="mb-8">
-          <div className="mb-2 flex items-baseline justify-between">
-            <h2 className="text-xs uppercase tracking-wide text-ash">Recent diary</h2>
-            {isOwner && (
-              <Link href="/diary" className="text-xs text-ash hover:text-paper">
-                See all
-              </Link>
-            )}
-          </div>
-          <ProfileDiaryList rows={diaryRows} />
-        </section>
-      )}
-
-      {watchlistRows.length > 0 && (
-        <section className="mb-8">
-          <div className="mb-2 flex items-baseline justify-between">
-            <h2 className="text-xs uppercase tracking-wide text-ash">Watchlist</h2>
-            {isOwner && (
-              <Link href="/watchlist" className="text-xs text-ash hover:text-paper">
-                See all
-              </Link>
-            )}
-          </div>
-          <ProfileWatchlistList rows={watchlistRows} />
-        </section>
-      )}
-
-      <section>
-        <h2 className="mb-2 text-xs uppercase tracking-wide text-ash">Library</h2>
-        {films_.length === 0 ? (
-          <p className="text-ash">No films logged yet.</p>
-        ) : (
-          <LibraryView films={films_} editable={isOwner} />
-        )}
-      </section>
+      <ProfileTabs
+        films={films_}
+        diaryRows={diaryRows}
+        watchlistRows={watchlistRows}
+        editable={isOwner}
+      />
     </div>
   );
 }

@@ -52,7 +52,6 @@ export default function LibraryView({ films, editable }: Props) {
   const [view, setView] = useState<"ledger" | "shelf">("ledger");
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortMode>("rating");
-  const [decade, setDecade] = useState("");
   const [ratedOnly, setRatedOnly] = useState<"all" | "rated" | "unrated">("all");
   const [items, setItems] = useState(films);
   const [prevFilms, setPrevFilms] = useState(films);
@@ -61,12 +60,6 @@ export default function LibraryView({ films, editable }: Props) {
     setPrevFilms(films);
     setItems(films);
   }
-
-  const decades = useMemo(() => {
-    const set = new Set<number>();
-    for (const f of items) if (f.year) set.add(Math.floor(f.year / 10) * 10);
-    return [...set].sort((a, b) => b - a);
-  }, [items]);
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -77,10 +70,6 @@ export default function LibraryView({ films, editable }: Props) {
           x.title.toLowerCase().includes(q) ||
           (x.director ?? "").toLowerCase().includes(q),
       );
-    }
-    if (decade) {
-      const d = Number(decade);
-      out = out.filter((x) => x.year !== null && Math.floor(x.year / 10) * 10 === d);
     }
     if (ratedOnly === "rated") out = out.filter((x) => x.rating !== null);
     if (ratedOnly === "unrated") out = out.filter((x) => x.rating === null);
@@ -106,11 +95,10 @@ export default function LibraryView({ films, editable }: Props) {
       });
     }
     return out;
-  }, [items, filter, decade, ratedOnly, sort]);
+  }, [items, filter, ratedOnly, sort]);
 
   // manual tie-reorder only makes sense in the default ranking with nothing hidden
-  const dragEnabled =
-    editable && sort === "rating" && !filter && !decade && ratedOnly === "all";
+  const dragEnabled = editable && sort === "rating" && !filter && ratedOnly === "all";
 
   return (
     <div>
@@ -132,19 +120,6 @@ export default function LibraryView({ films, editable }: Props) {
           {Object.entries(SORT_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={decade}
-          onChange={(e) => setDecade(e.target.value)}
-          aria-label="Decade"
-          className="rounded-card border border-seam bg-tray px-2 py-1.5 text-sm text-paper"
-        >
-          <option value="">Any decade</option>
-          {decades.map((d) => (
-            <option key={d} value={d}>
-              {d}s
             </option>
           ))}
         </select>
