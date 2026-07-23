@@ -26,6 +26,7 @@ export default async function ReviewsSection({ filmId, filmSlug, viewer, tab }: 
       authorId: users.id,
       username: users.username,
       displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
       privacy: users.privacy,
     })
     .from(diaryEntries)
@@ -82,6 +83,7 @@ export default async function ReviewsSection({ filmId, filmSlug, viewer, tab }: 
     watchedOn: r.watchedOn,
     username: r.username,
     displayName: r.displayName,
+    avatarUrl: r.avatarUrl,
     comments: commentRows
       .filter((c) => c.entryId === r.id && !blocked.has(c.authorId))
       .map((c) => ({

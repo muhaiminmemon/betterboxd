@@ -25,8 +25,11 @@ export default async function SettingsPage() {
         username={user.username}
         displayName={user.displayName}
         bio={user.bio}
+        avatarUrl={user.avatarUrl}
         privacy={user.privacy as "public" | "friends" | "private"}
         commentPermission={user.commentPermission as "anyone" | "friends" | "off"}
+        showDiaryOnProfile={user.showDiaryOnProfile}
+        showWatchlistOnProfile={user.showWatchlistOnProfile}
       />
       <BlockedList blocked={blockedUsers} />
       <section className="mt-10 border-t border-seam pt-6">

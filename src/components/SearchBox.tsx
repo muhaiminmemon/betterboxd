@@ -3,9 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { posterUrl } from "@/lib/tmdb-urls";
+import Avatar from "./Avatar";
 
 type Result = { tmdbId: number; title: string; year: number | null; posterPath: string | null };
-type UserResult = { id: string; username: string; displayName: string | null };
+type UserResult = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+};
 
 export default function SearchBox() {
   const [q, setQ] = useState("");
@@ -82,9 +88,7 @@ export default function SearchBox() {
                 }}
                 className="flex items-center gap-3 px-3 py-2 hover:bg-tray-2"
               >
-                <span className="flex size-8 items-center justify-center rounded-full bg-carbon text-xs text-ash">
-                  {(p.displayName ?? p.username).slice(0, 1).toUpperCase()}
-                </span>
+                <Avatar avatarUrl={p.avatarUrl} name={p.displayName ?? p.username} size={32} />
                 <span className="min-w-0">
                   <span className="block truncate text-sm text-paper">
                     {p.displayName ?? p.username}

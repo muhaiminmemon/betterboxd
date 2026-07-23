@@ -36,6 +36,7 @@ export default async function ListPage(ctx: { params: Promise<{ id: string }> })
       role: listMembers.role,
       username: users.username,
       displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
     })
     .from(listMembers)
     .innerJoin(users, eq(users.id, listMembers.userId))

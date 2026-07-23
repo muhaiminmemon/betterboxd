@@ -1,13 +1,17 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { friendRequests, users } from "@/db/schema";
+import { diaryEntries, films, friendRequests, users, watchlist } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { getRankedLibrary } from "@/lib/library";
 import { formatTenths } from "@/lib/format";
 import { areFriends, canViewProfile, isBlockedBetween } from "@/lib/social";
 import LibraryView from "@/components/LibraryView";
 import ProfileActions, { type Relationship } from "@/components/ProfileActions";
+import Avatar from "@/components/Avatar";
+import ProfileDiaryList from "@/components/ProfileDiaryList";
+import ProfileWatchlistList from "@/components/ProfileWatchlistList";
 
 export async function generateMetadata(ctx: { params: Promise<{ username: string }> }) {
   const { username } = await ctx.params;
@@ -55,57 +59,147 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
     }
   }
 
+  const displayLabel = profile.displayName ?? profile.username;
+
   if (!visible) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
-        <h1 className="display text-2xl">{profile.displayName ?? profile.username}</h1>
+        <Avatar avatarUrl={profile.avatarUrl} name={displayLabel} size={72} className="mx-auto" />
+        <h1 className="display mt-3 text-2xl">{displayLabel}</h1>
         <p className="mt-3 text-ash">This profile is private.</p>
         {viewer && !isOwner && (
-          <ProfileActions
-            profileId={profile.id}
-            profileUsername={profile.username}
-            viewerUsername={viewer.username}
-            relationship={relationship}
-          />
+          <div className="flex justify-center">
+            <ProfileActions
+              profileId={profile.id}
+              profileUsername={profile.username}
+              viewerUsername={viewer.username}
+              relationship={relationship}
+            />
+          </div>
         )}
       </div>
     );
   }
 
-  const films = await getRankedLibrary(profile.id, { includePrivate: isOwner });
-  const rated = films.filter((f) => f.rating !== null);
+  const films_ = await getRankedLibrary(profile.id, { includePrivate: isOwner });
+  const rated = films_.filter((f) => f.rating !== null);
   const mean =
     rated.length > 0
       ? formatTenths(Math.round(rated.reduce((s, f) => s + (f.rating ?? 0), 0) / rated.length))
       : null;
 
+  const showDiary = isOwner || profile.showDiaryOnProfile;
+  const showWatchlist = isOwner || profile.showWatchlistOnProfile;
+
+  const diaryRows = showDiary
+    ? await db
+        .select({
+          id: diaryEntries.id,
+          watchedOn: diaryEntries.watchedOn,
+          rating: diaryEntries.rating,
+          rewatch: diaryEntries.rewatch,
+          title: films.title,
+          year: films.year,
+          slug: films.slug,
+          posterPath: films.posterPath,
+        })
+        .from(diaryEntries)
+        .innerJoin(films, eq(films.id, diaryEntries.filmId))
+        .where(
+          and(
+            eq(diaryEntries.userId, profile.id),
+            isOwner ? sql`true` : eq(diaryEntries.private, false),
+          ),
+        )
+        .orderBy(sql`${diaryEntries.watchedOn} desc nulls last`, desc(diaryEntries.createdAt))
+        .limit(12)
+    : [];
+
+  const watchlistRows = showWatchlist
+    ? await db
+        .select({
+          filmId: watchlist.filmId,
+          title: films.title,
+          year: films.year,
+          slug: films.slug,
+          posterPath: films.posterPath,
+          source: watchlist.source,
+        })
+        .from(watchlist)
+        .innerJoin(films, eq(films.id, watchlist.filmId))
+        .where(eq(watchlist.userId, profile.id))
+        .orderBy(desc(watchlist.createdAt))
+        .limit(12)
+    : [];
+
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="display text-3xl font-medium">
-          {profile.displayName ?? profile.username}
-        </h1>
-        <p className="num mt-1 text-sm text-ash">
-          @{profile.username}
-          {films.length ? ` · ${films.length} films` : ""}
-          {mean ? ` · average ${mean}` : ""}
-        </p>
-        {profile.bio && <p className="mt-3 max-w-lg text-sm text-ash">{profile.bio}</p>}
-        {viewer && !isOwner && (
-          <ProfileActions
-            profileId={profile.id}
-            profileUsername={profile.username}
-            viewerUsername={viewer.username}
-            relationship={relationship}
-          />
-        )}
+      <div className="mb-8 flex items-start gap-4">
+        <Avatar avatarUrl={profile.avatarUrl} name={displayLabel} size={72} />
+        <div className="min-w-0 flex-1">
+          <h1 className="display text-3xl font-medium">{displayLabel}</h1>
+          <p className="num mt-1 text-sm text-ash">
+            @{profile.username}
+            {films_.length ? ` · ${films_.length} films` : ""}
+            {mean ? ` · average ${mean}` : ""}
+          </p>
+          {profile.bio && <p className="mt-3 max-w-lg text-sm text-ash">{profile.bio}</p>}
+          {isOwner ? (
+            <Link
+              href="/settings"
+              className="mt-4 inline-block rounded-card border border-seam px-4 py-1.5 text-sm text-paper hover:bg-tray"
+            >
+              Edit profile
+            </Link>
+          ) : (
+            viewer && (
+              <ProfileActions
+                profileId={profile.id}
+                profileUsername={profile.username}
+                viewerUsername={viewer.username}
+                relationship={relationship}
+              />
+            )
+          )}
+        </div>
       </div>
 
-      {films.length === 0 ? (
-        <p className="text-ash">No films logged yet.</p>
-      ) : (
-        <LibraryView films={films} editable={isOwner} />
+      {diaryRows.length > 0 && (
+        <section className="mb-8">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="text-xs uppercase tracking-wide text-ash">Recent diary</h2>
+            {isOwner && (
+              <Link href="/diary" className="text-xs text-ash hover:text-paper">
+                See all
+              </Link>
+            )}
+          </div>
+          <ProfileDiaryList rows={diaryRows} />
+        </section>
       )}
+
+      {watchlistRows.length > 0 && (
+        <section className="mb-8">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="text-xs uppercase tracking-wide text-ash">Watchlist</h2>
+            {isOwner && (
+              <Link href="/watchlist" className="text-xs text-ash hover:text-paper">
+                See all
+              </Link>
+            )}
+          </div>
+          <ProfileWatchlistList rows={watchlistRows} />
+        </section>
+      )}
+
+      <section>
+        <h2 className="mb-2 text-xs uppercase tracking-wide text-ash">Library</h2>
+        {films_.length === 0 ? (
+          <p className="text-ash">No films logged yet.</p>
+        ) : (
+          <LibraryView films={films_} editable={isOwner} />
+        )}
+      </section>
     </div>
   );
 }

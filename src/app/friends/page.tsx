@@ -22,6 +22,7 @@ export default async function FriendsPage() {
         id: f.id,
         username: f.username,
         displayName: f.displayName,
+        avatarUrl: f.avatarUrl,
         rated: e.rated,
       };
     }),
@@ -34,6 +35,7 @@ export default async function FriendsPage() {
       userId: fromUser.id,
       username: fromUser.username,
       displayName: fromUser.displayName,
+      avatarUrl: fromUser.avatarUrl,
     })
     .from(friendRequests)
     .innerJoin(fromUser, eq(fromUser.id, friendRequests.fromId))
@@ -45,6 +47,7 @@ export default async function FriendsPage() {
       userId: toUser.id,
       username: toUser.username,
       displayName: toUser.displayName,
+      avatarUrl: toUser.avatarUrl,
     })
     .from(friendRequests)
     .innerJoin(toUser, eq(toUser.id, friendRequests.toId))

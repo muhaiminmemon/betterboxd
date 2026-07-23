@@ -3,16 +3,34 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Avatar from "./Avatar";
 
-type Friend = { id: string; username: string; displayName: string | null; rated: number };
+type Friend = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  rated: number;
+};
 type IncomingRequest = {
   requestId: string;
   userId: string;
   username: string;
   displayName: string | null;
+  avatarUrl: string | null;
 };
-type OutgoingRequest = { userId: string; username: string; displayName: string | null };
-type PersonResult = { id: string; username: string; displayName: string | null };
+type OutgoingRequest = {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+};
+type PersonResult = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+};
 
 type Props = {
   me: string;
@@ -76,6 +94,7 @@ export default function FriendsPanel({ me, friends, incoming, outgoing }: Props)
           <ul className="mt-2 divide-y divide-seam border-y border-seam">
             {incoming.map((r) => (
               <li key={r.requestId} className="flex items-center gap-3 py-3">
+                <Avatar avatarUrl={r.avatarUrl} name={r.displayName ?? r.username} size={36} />
                 <span className="min-w-0 flex-1">
                   <Link href={`/${r.username}`} className="text-paper hover:underline">
                     {r.displayName ?? r.username}
@@ -108,6 +127,7 @@ export default function FriendsPanel({ me, friends, incoming, outgoing }: Props)
           <ul className="mt-2 space-y-1.5">
             {outgoing.map((r) => (
               <li key={r.userId} className="flex items-center gap-3 text-sm">
+                <Avatar avatarUrl={r.avatarUrl} name={r.displayName ?? r.username} size={24} />
                 <Link href={`/${r.username}`} className="text-paper hover:underline">
                   {r.displayName ?? r.username}
                 </Link>
@@ -135,6 +155,7 @@ export default function FriendsPanel({ me, friends, incoming, outgoing }: Props)
           <ul className="mt-2 divide-y divide-seam border-y border-seam">
             {friends.map((f) => (
               <li key={f.id} className="flex items-center gap-3 py-3">
+                <Avatar avatarUrl={f.avatarUrl} name={f.displayName ?? f.username} size={36} />
                 <span className="min-w-0 flex-1">
                   <Link href={`/${f.username}`} className="text-paper hover:underline">
                     {f.displayName ?? f.username}
@@ -251,6 +272,7 @@ function PeopleSearch({ onChanged }: { onChanged: () => void }) {
         <ul className="mt-2 divide-y divide-seam rounded-card border border-seam bg-tray">
           {results.map((p) => (
             <li key={p.id} className="flex items-center gap-3 px-3 py-2">
+              <Avatar avatarUrl={p.avatarUrl} name={p.displayName ?? p.username} size={32} />
               <span className="min-w-0 flex-1">
                 <Link href={`/${p.username}`} className="text-sm text-paper hover:underline">
                   {p.displayName ?? p.username}

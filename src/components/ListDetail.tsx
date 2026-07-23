@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { posterUrl } from "@/lib/tmdb-urls";
 import type { ListRole } from "@/lib/lists";
+import Avatar from "./Avatar";
 
 type Item = {
   filmId: string;
@@ -20,6 +21,7 @@ type Member = {
   role: string;
   username: string;
   displayName: string | null;
+  avatarUrl: string | null;
 };
 
 type Props = {
@@ -174,6 +176,7 @@ export default function ListDetail({ list, items, members, myRole, myUserId }: P
         <ul className="mt-2 space-y-1">
           {members.map((m) => (
             <li key={m.userId} className="flex items-center gap-2 text-sm">
+              <Avatar avatarUrl={m.avatarUrl} name={m.displayName ?? m.username} size={22} />
               <Link href={`/${m.username}`} className="text-paper hover:underline">
                 {m.displayName ?? m.username}
               </Link>

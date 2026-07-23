@@ -21,10 +21,16 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   bio: text("bio"),
+  // data URL (small, client-resized JPEG) — no external storage needed
+  avatarUrl: text("avatar_url"),
   // public | friends | private
   privacy: text("privacy").notNull().default("public"),
   // who may comment on their reviews: anyone | friends | off
   commentPermission: text("comment_permission").notNull().default("friends"),
+  // whether these sections appear on the PROFILE page for non-owners;
+  // the owner always sees everything of their own regardless of these
+  showDiaryOnProfile: boolean("show_diary_on_profile").notNull().default(true),
+  showWatchlistOnProfile: boolean("show_watchlist_on_profile").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

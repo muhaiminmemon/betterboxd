@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import SearchBox from "./SearchBox";
 import SignOutButton from "./SignOutButton";
 import NavLinks from "./NavLinks";
+import Avatar from "./Avatar";
 
 export default async function Nav() {
   const user = await getSessionUser();
@@ -20,9 +21,10 @@ export default async function Nav() {
               <SearchBox />
               <Link
                 href={`/${user.username}`}
-                className="text-sm text-ash hover:text-paper"
+                className="flex items-center gap-2 text-sm text-ash hover:text-paper"
                 title="Your public profile"
               >
+                <Avatar avatarUrl={user.avatarUrl} name={user.displayName ?? user.username} size={22} />
                 {user.displayName ?? user.username}
               </Link>
               <Link href="/settings" className="text-sm text-ash hover:text-paper">

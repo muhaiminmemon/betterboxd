@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Avatar from "./Avatar";
 
 export type ReviewData = {
   id: string;
@@ -12,6 +13,7 @@ export type ReviewData = {
   watchedOn: string | null;
   username: string;
   displayName: string | null;
+  avatarUrl: string | null;
   comments: {
     id: string;
     body: string;
@@ -70,7 +72,8 @@ export default function ReviewCard({
 
   return (
     <li className="border-b border-seam pb-4">
-      <div className="flex items-baseline gap-2 text-sm">
+      <div className="flex items-center gap-2 text-sm">
+        <Avatar avatarUrl={review.avatarUrl} name={review.displayName ?? review.username} size={24} />
         <Link href={`/${review.username}`} className="text-paper hover:underline">
           {review.displayName ?? review.username}
         </Link>
