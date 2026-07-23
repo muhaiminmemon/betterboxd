@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { friendRequests, users } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { getRankedLibrary } from "@/lib/library";
 import { formatTenths } from "@/lib/format";
 import { areFriends, canViewProfile, isBlockedBetween } from "@/lib/social";
 import LibraryView from "@/components/LibraryView";
-import ProfileActions from "@/components/ProfileActions";
+import ProfileActions, { type Relationship } from "@/components/ProfileActions";
 
 export async function generateMetadata(ctx: { params: Promise<{ username: string }> }) {
   const { username } = await ctx.params;
@@ -27,7 +27,33 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
   if (viewer && !isOwner && (await isBlockedBetween(viewer.id, profile.id))) notFound();
 
   const visible = await canViewProfile(viewer, profile);
-  const friends = viewer && !isOwner ? await areFriends(viewer.id, profile.id) : false;
+
+  let relationship: Relationship = { kind: "none" };
+  if (viewer && !isOwner) {
+    if (await areFriends(viewer.id, profile.id)) {
+      relationship = { kind: "friends" };
+    } else {
+      const incoming = (
+        await db
+          .select({ id: friendRequests.id })
+          .from(friendRequests)
+          .where(and(eq(friendRequests.fromId, profile.id), eq(friendRequests.toId, viewer.id)))
+          .limit(1)
+      )[0];
+      if (incoming) {
+        relationship = { kind: "requested_in", requestId: incoming.id };
+      } else {
+        const outgoing = (
+          await db
+            .select({ id: friendRequests.id })
+            .from(friendRequests)
+            .where(and(eq(friendRequests.fromId, viewer.id), eq(friendRequests.toId, profile.id)))
+            .limit(1)
+        )[0];
+        if (outgoing) relationship = { kind: "requested_out" };
+      }
+    }
+  }
 
   if (!visible) {
     return (
@@ -39,7 +65,7 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
             profileId={profile.id}
             profileUsername={profile.username}
             viewerUsername={viewer.username}
-            isFriend={friends}
+            relationship={relationship}
           />
         )}
       </div>
@@ -70,7 +96,7 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
             profileId={profile.id}
             profileUsername={profile.username}
             viewerUsername={viewer.username}
-            isFriend={friends}
+            relationship={relationship}
           />
         )}
       </div>

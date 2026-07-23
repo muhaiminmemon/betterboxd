@@ -150,6 +150,22 @@ export const friendships = pgTable(
   (t) => [uniqueIndex("friendship_pair_uq").on(t.userLowId, t.userHighId)],
 );
 
+/** Pending friend requests; accepting creates the mutual friendship. */
+export const friendRequests = pgTable(
+  "friend_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fromId: uuid("from_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    toId: uuid("to_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("friend_request_uq").on(t.fromId, t.toId)],
+);
+
 /** Shareable invite links; accepting one creates a mutual friendship. */
 export const invites = pgTable("invites", {
   token: text("token").primaryKey(),
