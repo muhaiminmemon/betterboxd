@@ -1,0 +1,48 @@
+import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@/db";
+import { diaryEntries } from "@/db/schema";
+import { getSessionUser } from "@/lib/auth";
+
+const patchSchema = z.object({
+  watchedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  rating: z.number().int().min(10).max(100).nullable().optional(),
+  review: z.string().max(20000).nullable().optional(),
+  rewatch: z.boolean().optional(),
+});
+
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  const { id } = await ctx.params;
+
+  const parsed = patchSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Bad request." }, { status: 400 });
+  if (Object.values(parsed.data).every((v) => v === undefined)) {
+    return NextResponse.json({ error: "Nothing to change." }, { status: 400 });
+  }
+
+  const updated = await db
+    .update(diaryEntries)
+    .set(parsed.data)
+    .where(and(eq(diaryEntries.id, id), eq(diaryEntries.userId, user.id)))
+    .returning();
+  if (!updated[0]) return NextResponse.json({ error: "Entry not found." }, { status: 404 });
+
+  return NextResponse.json({ entry: updated[0] });
+}
+
+export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  const { id } = await ctx.params;
+
+  const deleted = await db
+    .delete(diaryEntries)
+    .where(and(eq(diaryEntries.id, id), eq(diaryEntries.userId, user.id)))
+    .returning({ id: diaryEntries.id });
+  if (!deleted[0]) return NextResponse.json({ error: "Entry not found." }, { status: 404 });
+
+  return NextResponse.json({ ok: true });
+}

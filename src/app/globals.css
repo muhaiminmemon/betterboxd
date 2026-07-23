@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* projection-room graphite — chrome stays quiet, posters carry the color */
+  --color-carbon: #141417;
+  --color-tray: #1c1c21;
+  --color-tray-2: #232329;
+  --color-seam: #2a2a31;
+  --color-paper: #eceae6;
+  --color-ash: #9a9aa3;
+  --color-beam: #8faecc;
+  --color-warn: #c4756a;
+
+  --font-display: var(--font-space-grotesk), sans-serif;
+  --font-body: var(--font-plex), sans-serif;
+
+  --radius-card: 6px;
+
+  --text-2xs: 0.75rem;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: #141417;
+  color: #eceae6;
+  font-family: var(--font-plex), sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ratings and anything columnar: decimal points must align */
+.num {
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+.display {
+  font-family: var(--font-space-grotesk), sans-serif;
+  letter-spacing: -0.02em;
+}
+
+::selection {
+  background: #8faecc;
+  color: #141417;
+}
+
+:focus-visible {
+  outline: 2px solid #8faecc;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* poster grids fade in once; nothing shimmers */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-up {
+  animation: fade-up 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
