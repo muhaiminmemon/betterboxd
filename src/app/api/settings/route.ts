@@ -9,6 +9,7 @@ const schema = z.object({
   displayName: z.string().max(60).nullable().optional(),
   bio: z.string().max(1000).nullable().optional(),
   privacy: z.enum(["public", "friends", "private"]).optional(),
+  commentPermission: z.enum(["anyone", "friends", "off"]).optional(),
 });
 
 export async function POST(req: Request) {

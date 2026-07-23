@@ -10,12 +10,26 @@ export type TmdbMovie = {
   backdrop_path?: string | null;
   overview?: string;
   popularity?: number;
+  vote_count?: number;
+  genre_ids?: number[];
 };
 
 export type TmdbMovieDetails = TmdbMovie & {
   runtime?: number | null;
   genres?: { id: number; name: string }[];
-  credits?: { crew?: { job: string; name: string }[] };
+  credits?: {
+    crew?: { job: string; name: string }[];
+    cast?: { name: string; order?: number }[];
+  };
+  keywords?: { keywords?: { name: string }[] };
+};
+
+/** TMDB's fixed movie-genre taxonomy, so list results carry names without extra calls. */
+export const GENRES_BY_ID: Record<number, string> = {
+  28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime",
+  99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History",
+  27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance",
+  878: "Science Fiction", 10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western",
 };
 
 export class TmdbError extends Error {}
@@ -43,7 +57,47 @@ export async function searchMovies(query: string, year?: number): Promise<TmdbMo
 }
 
 export async function movieDetails(tmdbId: number): Promise<TmdbMovieDetails> {
-  return tmdb<TmdbMovieDetails>(`/movie/${tmdbId}`, { append_to_response: "credits" });
+  return tmdb<TmdbMovieDetails>(`/movie/${tmdbId}`, {
+    append_to_response: "credits,keywords",
+  });
+}
+
+export async function topRatedMovies(page: number): Promise<TmdbMovie[]> {
+  const data = await tmdb<{ results: TmdbMovie[] }>("/movie/top_rated", { page: String(page) });
+  return data.results ?? [];
+}
+
+export async function popularMovies(page: number): Promise<TmdbMovie[]> {
+  const data = await tmdb<{ results: TmdbMovie[] }>("/movie/popular", { page: String(page) });
+  return data.results ?? [];
+}
+
+export async function discoverByGenre(genreId: number, page: number): Promise<TmdbMovie[]> {
+  const data = await tmdb<{ results: TmdbMovie[] }>("/discover/movie", {
+    with_genres: String(genreId),
+    sort_by: "vote_count.desc",
+    "vote_count.gte": "300",
+    include_adult: "false",
+    page: String(page),
+  });
+  return data.results ?? [];
+}
+
+export async function discoverByDirectorName(name: string): Promise<TmdbMovie[]> {
+  const people = await tmdb<{ results: { id: number; known_for_department?: string }[] }>(
+    "/search/person",
+    { query: name, include_adult: "false" },
+  );
+  const person = people.results?.find((p) => p.known_for_department === "Directing") ??
+    people.results?.[0];
+  if (!person) return [];
+  const data = await tmdb<{ results: TmdbMovie[] }>("/discover/movie", {
+    with_crew: String(person.id),
+    sort_by: "vote_count.desc",
+    "vote_count.gte": "100",
+    include_adult: "false",
+  });
+  return data.results ?? [];
 }
 
 export function releaseYear(m: { release_date?: string }): number | null {

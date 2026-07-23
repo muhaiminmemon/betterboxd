@@ -62,15 +62,24 @@ Stars × 2 (`4★ → 8.0`). Upload `diary.csv`, `ratings.csv`, `watched.csv`, o
 `watchlist.csv`. The importer previews everything, lets you correct unmatched
 titles, is idempotent (re-importing never duplicates), and can be undone.
 
-## Roadmap
+## Features
 
-- **Alpha 0 — done:** auth, import with preview/correction/undo, ranked library
-  with drag-to-reorder ties, rating dial, rewatch timeline, public profiles,
-  diary, watchlist with capture reason, full export
-- **Alpha 1:** richer logging, reviews with spoiler labels
-- **Alpha 2:** mutual friends, "What should we watch?" (metadata scoring,
-  conservative pair combination, no visible fit scores)
-- **Phase 3:** friends feed, comments, collaborative lists, blocking/reporting
+- **Diary & ratings:** 1.0–10.0 in tenths via the rating dial (tap `8` → 8.0,
+  refine to 8.7); watched-no-rating is first-class; historical ratings never
+  change; rewatch timeline per film; reviews with spoiler labels and private
+  entries
+- **Import:** Letterboxd CSVs with preview, title correction, undo, idempotency
+- **Library:** ranked ledger + shelf views, drag-to-reorder within rating ties
+- **Friends:** mutual only, via invite links; no one-way following
+- **"What should we watch?":** five films neither person has logged — metadata
+  scoring only (genres, directors, decades, cast, keywords), normalized per
+  user, combined by taking the *lower* of the two scores, diversified; no fit
+  scores shown; already-seen / not-interested feedback; "show five more" has
+  memory; saving starts a shared list
+- **Social:** friends-only chronological feed, review comments with
+  permissions, collaborative lists (owner / editor / viewer), blocking,
+  reporting, public / friends / private profiles
+- **Export:** everything — diary, reviews, watchlist, lists — free forever
 
 Film data from [TMDB](https://www.themoviedb.org). This product uses the TMDB
 API but is not endorsed or certified by TMDB.

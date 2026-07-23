@@ -9,6 +9,8 @@ const patchSchema = z.object({
   watchedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   rating: z.number().int().min(10).max(100).nullable().optional(),
   review: z.string().max(20000).nullable().optional(),
+  spoiler: z.boolean().optional(),
+  private: z.boolean().optional(),
   rewatch: z.boolean().optional(),
 });
 

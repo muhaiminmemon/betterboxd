@@ -1,12 +1,22 @@
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { blocks, users } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import SettingsForm from "@/components/SettingsForm";
+import BlockedList from "@/components/BlockedList";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+
+  const blockedUsers = await db
+    .select({ id: users.id, username: users.username, displayName: users.displayName })
+    .from(blocks)
+    .innerJoin(users, eq(users.id, blocks.blockedId))
+    .where(eq(blocks.blockerId, user.id));
 
   return (
     <div className="max-w-md">
@@ -16,7 +26,9 @@ export default async function SettingsPage() {
         displayName={user.displayName}
         bio={user.bio}
         privacy={user.privacy as "public" | "friends" | "private"}
+        commentPermission={user.commentPermission as "anyone" | "friends" | "off"}
       />
+      <BlockedList blocked={blockedUsers} />
       <section className="mt-10 border-t border-seam pt-6">
         <h2 className="text-sm uppercase tracking-wide text-ash">Your data</h2>
         <p className="mt-2 text-sm text-ash">

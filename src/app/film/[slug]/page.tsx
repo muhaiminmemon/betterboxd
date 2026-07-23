@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { diaryEntries, films, watchlist } from "@/db/schema";
+import { diaryEntries, films, listMembers, lists, watchlist } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { hydrateFilm } from "@/lib/films";
 import PosterImg from "@/components/PosterImg";
 import FilmPanel from "@/components/FilmPanel";
 import RewatchTimeline from "@/components/RewatchTimeline";
+import ReviewsSection from "@/components/ReviewsSection";
 
 export async function generateMetadata(ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params;
@@ -15,8 +16,13 @@ export async function generateMetadata(ctx: { params: Promise<{ slug: string }> 
   return { title: film ? `${film.title}${film.year ? ` (${film.year})` : ""}` : "Film" };
 }
 
-export default async function FilmPage(ctx: { params: Promise<{ slug: string }> }) {
+export default async function FilmPage(ctx: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ reviews?: string }>;
+}) {
   const { slug } = await ctx.params;
+  const { reviews: reviewsParam } = await ctx.searchParams;
+  const reviewsTab = reviewsParam === "recent" ? ("recent" as const) : ("friends" as const);
   let film = (await db.select().from(films).where(eq(films.slug, slug)).limit(1))[0];
   if (!film) notFound();
   film = await hydrateFilm(film);
@@ -49,6 +55,22 @@ export default async function FilmPage(ctx: { params: Promise<{ slug: string }> 
           .limit(1)
       )[0]
     : undefined;
+
+  let editableLists: { id: string; title: string }[] = [];
+  if (user) {
+    const memberships = await db
+      .select({ listId: listMembers.listId })
+      .from(listMembers)
+      .where(
+        and(eq(listMembers.userId, user.id), inArray(listMembers.role, ["owner", "editor"])),
+      );
+    if (memberships.length) {
+      editableLists = await db
+        .select({ id: lists.id, title: lists.title })
+        .from(lists)
+        .where(inArray(lists.id, memberships.map((m) => m.listId)));
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8 md:flex-row">
@@ -91,6 +113,7 @@ export default async function FilmPage(ctx: { params: Promise<{ slug: string }> 
               currentRating={currentRated?.rating ?? null}
               inWatchlist={Boolean(wlRow)}
               watchlistSource={wlRow?.source ?? null}
+              lists={editableLists}
             />
           ) : (
             <p className="text-ash">
@@ -100,6 +123,7 @@ export default async function FilmPage(ctx: { params: Promise<{ slug: string }> 
               to log and rate this film.
             </p>
           )}
+          <ReviewsSection filmId={film.id} filmSlug={film.slug} viewer={user} tab={reviewsTab} />
         </div>
       </div>
     </div>

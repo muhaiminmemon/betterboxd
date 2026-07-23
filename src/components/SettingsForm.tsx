@@ -8,6 +8,7 @@ type Props = {
   displayName: string | null;
   bio: string | null;
   privacy: "public" | "friends" | "private";
+  commentPermission: "anyone" | "friends" | "off";
 };
 
 export default function SettingsForm(props: Props) {
@@ -15,6 +16,7 @@ export default function SettingsForm(props: Props) {
   const [displayName, setDisplayName] = useState(props.displayName ?? "");
   const [bio, setBio] = useState(props.bio ?? "");
   const [privacy, setPrivacy] = useState(props.privacy);
+  const [commentPermission, setCommentPermission] = useState(props.commentPermission);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -30,6 +32,7 @@ export default function SettingsForm(props: Props) {
           displayName: displayName || null,
           bio: bio || null,
           privacy,
+          commentPermission,
         }),
       });
       if (res.ok) {
@@ -81,6 +84,30 @@ export default function SettingsForm(props: Props) {
                 onChange={() => setPrivacy(value)}
               />
               <span className={privacy === value ? "text-paper" : "text-ash"}>{label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend className="mb-1 text-sm text-ash">Comments on your reviews</legend>
+        <div className="space-y-1.5">
+          {(
+            [
+              ["anyone", "Anyone signed in"],
+              ["friends", "Friends only"],
+              ["off", "Off"],
+            ] as const
+          ).map(([value, label]) => (
+            <label key={value} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="commentPermission"
+                checked={commentPermission === value}
+                onChange={() => setCommentPermission(value)}
+              />
+              <span className={commentPermission === value ? "text-paper" : "text-ash"}>
+                {label}
+              </span>
             </label>
           ))}
         </div>

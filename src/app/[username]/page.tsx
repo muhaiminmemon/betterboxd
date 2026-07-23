@@ -5,7 +5,9 @@ import { users } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { getRankedLibrary } from "@/lib/library";
 import { formatTenths } from "@/lib/format";
+import { areFriends, canViewProfile, isBlockedBetween } from "@/lib/social";
 import LibraryView from "@/components/LibraryView";
+import ProfileActions from "@/components/ProfileActions";
 
 export async function generateMetadata(ctx: { params: Promise<{ username: string }> }) {
   const { username } = await ctx.params;
@@ -22,17 +24,29 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
   const viewer = await getSessionUser();
   const isOwner = viewer?.id === profile.id;
 
-  // friends-only acts as private until friendships ship
-  if (profile.privacy !== "public" && !isOwner) {
+  if (viewer && !isOwner && (await isBlockedBetween(viewer.id, profile.id))) notFound();
+
+  const visible = await canViewProfile(viewer, profile);
+  const friends = viewer && !isOwner ? await areFriends(viewer.id, profile.id) : false;
+
+  if (!visible) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
         <h1 className="display text-2xl">{profile.displayName ?? profile.username}</h1>
         <p className="mt-3 text-ash">This profile is private.</p>
+        {viewer && !isOwner && (
+          <ProfileActions
+            profileId={profile.id}
+            profileUsername={profile.username}
+            viewerUsername={viewer.username}
+            isFriend={friends}
+          />
+        )}
       </div>
     );
   }
 
-  const films = await getRankedLibrary(profile.id);
+  const films = await getRankedLibrary(profile.id, { includePrivate: isOwner });
   const rated = films.filter((f) => f.rating !== null);
   const mean =
     rated.length > 0
@@ -51,6 +65,14 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
           {mean ? ` · average ${mean}` : ""}
         </p>
         {profile.bio && <p className="mt-3 max-w-lg text-sm text-ash">{profile.bio}</p>}
+        {viewer && !isOwner && (
+          <ProfileActions
+            profileId={profile.id}
+            profileUsername={profile.username}
+            viewerUsername={viewer.username}
+            isFriend={friends}
+          />
+        )}
       </div>
 
       {films.length === 0 ? (

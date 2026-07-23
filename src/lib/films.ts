@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { films, type Film } from "@/db/schema";
-import { directorOf, movieDetails, releaseYear, type TmdbMovie } from "./tmdb";
+import { directorOf, GENRES_BY_ID, movieDetails, releaseYear, type TmdbMovie } from "./tmdb";
 
 export function slugify(title: string, year: number | null): string {
   const base = title
@@ -43,6 +43,55 @@ export async function ensureFilm(movie: TmdbMovie): Promise<Film> {
   return won[0];
 }
 
+/** Batch upsert of TMDB list results; returns all matching film rows keyed by tmdbId. */
+export async function bulkEnsureFilms(movies: TmdbMovie[]): Promise<Map<number, Film>> {
+  const unique = new Map<number, TmdbMovie>();
+  for (const m of movies) if (!unique.has(m.id)) unique.set(m.id, m);
+  const ids = [...unique.keys()];
+  if (!ids.length) return new Map();
+
+  const existing = ids.length
+    ? await db.select().from(films).where(inArray(films.tmdbId, ids))
+    : [];
+  const byTmdb = new Map(existing.filter((f) => f.tmdbId).map((f) => [f.tmdbId!, f]));
+
+  const missing = [...unique.values()].filter((m) => !byTmdb.has(m.id));
+  for (const chunk of chunked(missing, 100)) {
+    const values = chunk.map((m) => {
+      const year = releaseYear(m);
+      return {
+        tmdbId: m.id,
+        // suffix keeps slugs collision-free in bulk; single inserts get clean slugs
+        slug: `${slugify(m.title, year)}-${m.id}`,
+        title: m.title,
+        year,
+        posterPath: m.poster_path ?? null,
+        backdropPath: m.backdrop_path ?? null,
+        overview: m.overview ?? null,
+        genres: m.genre_ids?.map((g) => GENRES_BY_ID[g]).filter(Boolean) ?? null,
+        popularity: m.popularity ?? null,
+        voteCount: m.vote_count ?? null,
+      };
+    });
+    const inserted = await db.insert(films).values(values).onConflictDoNothing().returning();
+    for (const f of inserted) if (f.tmdbId) byTmdb.set(f.tmdbId, f);
+  }
+  // pick up rows that lost insert races
+  const still = ids.filter((id) => !byTmdb.has(id));
+  if (still.length) {
+    for (const f of await db.select().from(films).where(inArray(films.tmdbId, still))) {
+      if (f.tmdbId) byTmdb.set(f.tmdbId, f);
+    }
+  }
+  return byTmdb;
+}
+
+function chunked<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 const STALE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Fill in director/runtime/genres on demand; refresh stale metadata. */
@@ -62,6 +111,12 @@ export async function hydrateFilm(film: Film): Promise<Film> {
         director: directorOf(details) ?? film.director,
         runtime: details.runtime ?? film.runtime,
         genres: details.genres?.map((g) => g.name) ?? film.genres,
+        castNames:
+          details.credits?.cast?.slice(0, 10).map((c) => c.name) ?? film.castNames,
+        keywords:
+          details.keywords?.keywords?.slice(0, 15).map((k) => k.name) ?? film.keywords,
+        popularity: details.popularity ?? film.popularity,
+        voteCount: details.vote_count ?? film.voteCount,
         overview: details.overview ?? film.overview,
         refreshedAt: new Date(),
       })

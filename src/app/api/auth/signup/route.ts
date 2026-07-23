@@ -8,7 +8,7 @@ import { createSession, hashPassword } from "@/lib/auth";
 const RESERVED = new Set([
   "api", "film", "films", "import", "library", "login", "signup", "logout",
   "settings", "watchlist", "diary", "watch", "export", "friends", "lists",
-  "search", "about", "help", "admin", "betterboxd",
+  "search", "about", "help", "admin", "betterboxd", "invite", "feed",
 ]);
 
 const schema = z.object({

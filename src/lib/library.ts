@@ -20,19 +20,23 @@ export type LibraryFilm = {
  * entry — an unrated later viewing never erases the last actual rating.
  * Equal ratings keep the user's manual order (sort_key), then title.
  */
-export async function getRankedLibrary(userId: string): Promise<LibraryFilm[]> {
+export async function getRankedLibrary(
+  userId: string,
+  { includePrivate = true }: { includePrivate?: boolean } = {},
+): Promise<LibraryFilm[]> {
+  const privacyFilter = includePrivate ? sql`true` : sql`private = false`;
   const rows = await db.execute(sql`
     with rated as (
       select distinct on (film_id)
         film_id, rating
       from diary_entries
-      where user_id = ${userId} and rating is not null
+      where user_id = ${userId} and rating is not null and ${privacyFilter}
       order by film_id, watched_on desc nulls last, created_at desc
     ),
     stats as (
       select film_id, count(*)::int as entry_count, max(watched_on) as last_watched
       from diary_entries
-      where user_id = ${userId}
+      where user_id = ${userId} and ${privacyFilter}
       group by film_id
     )
     select

@@ -21,6 +21,7 @@ type Props = {
   currentRating: number | null;
   inWatchlist: boolean;
   watchlistSource: string | null;
+  lists: { id: string; title: string }[];
 };
 
 export default function FilmPanel({
@@ -30,6 +31,7 @@ export default function FilmPanel({
   currentRating,
   inWatchlist,
   watchlistSource,
+  lists,
 }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -38,6 +40,11 @@ export default function FilmPanel({
   const [logDate, setLogDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [logNoDate, setLogNoDate] = useState(false);
   const [logRating, setLogRating] = useState<number | null>(null);
+  const [logReview, setLogReview] = useState("");
+  const [logSpoiler, setLogSpoiler] = useState(false);
+  const [logPrivate, setLogPrivate] = useState(false);
+  const [listChoice, setListChoice] = useState("");
+  const [addedToList, setAddedToList] = useState(false);
   const [wl, setWl] = useState(inWatchlist);
   const [wlSource, setWlSource] = useState(watchlistSource ?? "");
   const [wlAskSource, setWlAskSource] = useState(false);
@@ -89,6 +96,9 @@ export default function FilmPanel({
           filmId,
           watchedOn: logNoDate ? null : logDate,
           rating: logRating,
+          review: logReview.trim() || null,
+          spoiler: logSpoiler,
+          private: logPrivate,
           rewatch: entries.length > 0,
         }),
       }),
@@ -96,6 +106,24 @@ export default function FilmPanel({
     if (ok) {
       setLogOpen(false);
       setLogRating(null);
+      setLogReview("");
+      setLogSpoiler(false);
+      setLogPrivate(false);
+    }
+  }
+
+  async function addToList() {
+    if (!listChoice) return;
+    const ok = await call(() =>
+      fetch(`/api/lists/${listChoice}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filmId }),
+      }),
+    );
+    if (ok) {
+      setAddedToList(true);
+      setTimeout(() => setAddedToList(false), 2000);
     }
   }
 
@@ -205,6 +233,37 @@ export default function FilmPanel({
                 </button>
               )}
             </div>
+            <div className="mt-3">
+              <label htmlFor="log-review" className="mb-1 block text-sm text-ash">
+                Review — optional
+              </label>
+              <textarea
+                id="log-review"
+                value={logReview}
+                onChange={(e) => setLogReview(e.target.value)}
+                rows={3}
+                maxLength={20000}
+                className="w-full rounded-card border border-seam bg-carbon px-3 py-2 text-sm focus:border-beam focus:outline-none"
+              />
+              <div className="mt-1.5 flex gap-4 text-sm text-ash">
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={logSpoiler}
+                    onChange={(e) => setLogSpoiler(e.target.checked)}
+                  />
+                  Mentions plot details
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={logPrivate}
+                    onChange={(e) => setLogPrivate(e.target.checked)}
+                  />
+                  Only me
+                </label>
+              </div>
+            </div>
             <div className="mt-4 flex gap-3">
               <button
                 type="button"
@@ -223,6 +282,33 @@ export default function FilmPanel({
               </button>
             </div>
           </div>
+        )}
+        {!logOpen && lists.length > 0 && (
+          <span className="flex items-center gap-2">
+            <select
+              value={listChoice}
+              onChange={(e) => setListChoice(e.target.value)}
+              aria-label="Add to a list"
+              className="rounded-card border border-seam bg-tray px-2 py-1.5 text-sm text-ash"
+            >
+              <option value="">Add to a list…</option>
+              {lists.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.title}
+                </option>
+              ))}
+            </select>
+            {listChoice && (
+              <button
+                type="button"
+                onClick={addToList}
+                disabled={busy}
+                className="text-sm text-ash hover:text-paper disabled:opacity-50"
+              >
+                {addedToList ? "Added" : "Add"}
+              </button>
+            )}
+          </span>
         )}
         {wlAskSource && (
           <div className="flex w-full max-w-sm items-center gap-2">

@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const next = useSearchParams().get("next");
   const [identity, setIdentity] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +35,7 @@ export default function LoginPage() {
         setError(data.error);
         return;
       }
-      router.push("/library");
+      router.push(next && next.startsWith("/") ? next : "/library");
       router.refresh();
     } finally {
       setBusy(false);

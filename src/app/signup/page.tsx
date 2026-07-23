@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
+function SignupForm() {
   const router = useRouter();
+  const next = useSearchParams().get("next");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +36,7 @@ export default function SignupPage() {
         setError(data.error);
         return;
       }
-      router.push("/import");
+      router.push(next && next.startsWith("/") ? next : "/import");
       router.refresh();
     } finally {
       setBusy(false);
