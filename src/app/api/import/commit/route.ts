@@ -107,7 +107,7 @@ export async function POST(req: Request) {
         if (r.rating !== null) rated.add(filmId);
       }
     } else if (r.kind === "ratings") {
-      // ratings.csv duplicates diary ratings — only fill films with no rated entry
+      // ratings.csv duplicates diary ratings, so only fill films with no rated entry
       if (rated.has(filmId) || r.rating === null) continue;
       const inserted = await db
         .insert(diaryEntries)
@@ -127,7 +127,7 @@ export async function POST(req: Request) {
         rated.add(filmId);
       }
     } else if (r.kind === "watched") {
-      // watched.csv marks films seen — only films not otherwise logged
+      // watched.csv marks films seen, so only films not otherwise logged
       if (logged.has(filmId)) continue;
       const inserted = await db
         .insert(diaryEntries)

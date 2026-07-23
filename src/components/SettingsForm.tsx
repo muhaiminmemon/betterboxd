@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { errorFrom } from "@/lib/http";
 import AvatarUpload from "./AvatarUpload";
 
 type Props = {
@@ -27,11 +28,22 @@ export default function SettingsForm(props: Props) {
   );
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /** Any edit invalidates the "Saved" badge, which should describe what's on the server. */
+  function edited<T>(set: (v: T) => void) {
+    return (v: T) => {
+      setSaved(false);
+      set(v);
+    };
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setBusy(true);
     setSaved(false);
+    setError(null);
     try {
       const res = await fetch("/api/settings", {
         method: "POST",
@@ -45,10 +57,14 @@ export default function SettingsForm(props: Props) {
           showWatchlistOnProfile,
         }),
       });
-      if (res.ok) {
-        setSaved(true);
-        router.refresh();
+      if (!res.ok) {
+        setError(await errorFrom(res, "Couldn't save your settings. Try again."));
+        return;
       }
+      setSaved(true);
+      router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
@@ -70,7 +86,7 @@ export default function SettingsForm(props: Props) {
           <span className="mb-1 block text-sm text-ash">Display name</span>
           <input
             value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
+            onChange={(e) => edited(setDisplayName)(e.target.value)}
             maxLength={60}
             placeholder={props.username}
             className="w-full rounded-card border border-seam bg-tray px-3 py-2 focus:border-beam focus:outline-none"
@@ -80,7 +96,7 @@ export default function SettingsForm(props: Props) {
           <span className="mb-1 block text-sm text-ash">Bio</span>
           <textarea
             value={bio}
-            onChange={(e) => setBio(e.target.value)}
+            onChange={(e) => edited(setBio)(e.target.value)}
             maxLength={1000}
             rows={3}
             className="w-full rounded-card border border-seam bg-tray px-3 py-2 focus:border-beam focus:outline-none"
@@ -91,9 +107,9 @@ export default function SettingsForm(props: Props) {
           <div className="space-y-1.5">
             {(
               [
-                ["public", "Public — anyone with the link can see your profile"],
+                ["public", "Public: anyone with the link can see your profile"],
                 ["friends", "Friends only"],
-                ["private", "Private — only you"],
+                ["private", "Private: only you"],
               ] as const
             ).map(([value, label]) => (
               <label key={value} className="flex items-center gap-2 text-sm">
@@ -101,7 +117,7 @@ export default function SettingsForm(props: Props) {
                   type="radio"
                   name="privacy"
                   checked={privacy === value}
-                  onChange={() => setPrivacy(value)}
+                  onChange={() => edited(setPrivacy)(value)}
                 />
                 <span className={privacy === value ? "text-paper" : "text-ash"}>{label}</span>
               </label>
@@ -121,7 +137,7 @@ export default function SettingsForm(props: Props) {
               <input
                 type="checkbox"
                 checked={showDiaryOnProfile}
-                onChange={(e) => setShowDiaryOnProfile(e.target.checked)}
+                onChange={(e) => edited(setShowDiaryOnProfile)(e.target.checked)}
               />
               <span className={showDiaryOnProfile ? "text-paper" : "text-ash"}>
                 Recent diary entries
@@ -131,7 +147,7 @@ export default function SettingsForm(props: Props) {
               <input
                 type="checkbox"
                 checked={showWatchlistOnProfile}
-                onChange={(e) => setShowWatchlistOnProfile(e.target.checked)}
+                onChange={(e) => edited(setShowWatchlistOnProfile)(e.target.checked)}
               />
               <span className={showWatchlistOnProfile ? "text-paper" : "text-ash"}>
                 Watchlist
@@ -157,7 +173,7 @@ export default function SettingsForm(props: Props) {
                   type="radio"
                   name="commentPermission"
                   checked={commentPermission === value}
-                  onChange={() => setCommentPermission(value)}
+                  onChange={() => edited(setCommentPermission)(value)}
                 />
                 <span className={commentPermission === value ? "text-paper" : "text-ash"}>
                   {label}
@@ -175,6 +191,7 @@ export default function SettingsForm(props: Props) {
             Save
           </button>
           {saved && <span className="text-sm text-ash">Saved</span>}
+          {error && <span className="text-sm text-warn">{error}</span>}
         </div>
       </form>
     </div>

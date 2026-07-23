@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { errorFrom } from "@/lib/http";
 
 export default function LoginPage() {
   return (
@@ -30,13 +31,14 @@ function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identity, password }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error);
+        setError(await errorFrom(res, "Couldn't sign you in. Try again."));
         return;
       }
       router.push(next && next.startsWith("/") ? next : "/library");
       router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setBusy(false);
     }

@@ -127,7 +127,7 @@ export default function ImportWizard() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Import failed. Nothing was changed — try again.");
+        setError(data.error ?? "Import failed. Nothing was changed, so try again.");
         return;
       }
       setResult(data);
@@ -163,7 +163,7 @@ export default function ImportWizard() {
           <code className="text-paper">watchlist.csv</code>.
         </p>
         <p className="mt-3 text-sm text-ash">
-          Stars carry over doubled: 4★ becomes 8.0, 3½★ becomes 7.0. Your history stays intact —
+          Stars carry over doubled: 4★ becomes 8.0, 3½★ becomes 7.0. Your history stays intact:
           you can undo an import, and importing the same file twice never duplicates entries.
         </p>
         <div className="mt-5 flex items-center gap-3">
@@ -279,7 +279,7 @@ export default function ImportWizard() {
             {unmatchedKeys.length} {unmatchedKeys.length === 1 ? "title needs" : "titles need"} a match
           </h3>
           <p className="mt-1 text-sm text-ash">
-            Find each one on TMDB, or skip it — everything else imports either way.
+            Find each one on TMDB, or skip it. Everything else imports either way.
           </p>
           <ul className="mt-3 space-y-3">
             {unmatchedKeys.slice(0, 20).map((k) => {
@@ -331,7 +331,7 @@ function PreviewList({
   return (
     <section className="mt-5">
       <h3 className="mb-2 text-sm text-ash">
-        Preview{rows.length > preview.length ? ` — first ${preview.length} of ${rows.length} rows` : ""}
+        Preview{rows.length > preview.length ? `: first ${preview.length} of ${rows.length} rows` : ""}
       </h3>
       <ul className="divide-y divide-seam border-y border-seam">
         {preview.map((r) => {

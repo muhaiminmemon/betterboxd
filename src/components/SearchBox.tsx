@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { posterUrl } from "@/lib/tmdb-urls";
+import { readJson } from "@/lib/http";
 import Avatar from "./Avatar";
 
 type Result = { tmdbId: number; title: string; year: number | null; posterPath: string | null };
@@ -22,6 +23,9 @@ export default function SearchBox() {
 
   useEffect(() => {
     const query = q.trim();
+    // abort in-flight work: without this a slow response for "a" can land
+    // after "ab" and overwrite the newer results
+    const ac = new AbortController();
     const t = setTimeout(async () => {
       if (!query) {
         setResults([]);
@@ -30,20 +34,25 @@ export default function SearchBox() {
       }
       try {
         const [filmsRes, peopleRes] = await Promise.all([
-          fetch(`/api/search?q=${encodeURIComponent(query)}`),
-          fetch(`/api/users/search?q=${encodeURIComponent(query)}`),
+          fetch(`/api/search?q=${encodeURIComponent(query)}`, { signal: ac.signal }),
+          fetch(`/api/users/search?q=${encodeURIComponent(query)}`, { signal: ac.signal }),
         ]);
-        const filmsData = await filmsRes.json();
-        const peopleData = await peopleRes.json();
+        const filmsData = await readJson<{ results: Result[] }>(filmsRes);
+        const peopleData = await readJson<{ results: UserResult[] }>(peopleRes);
+        if (ac.signal.aborted) return;
         setResults(filmsData.results ?? []);
         setPeople(peopleData.results ?? []);
         setOpen(true);
       } catch {
+        if (ac.signal.aborted) return;
         setResults([]);
         setPeople([]);
       }
     }, 250);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
   }, [q]);
 
   useEffect(() => {

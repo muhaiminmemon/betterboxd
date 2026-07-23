@@ -36,6 +36,22 @@ export function starsToTenths(stars: string | number | null | undefined): number
   return Math.min(100, Math.max(10, tenths));
 }
 
+/**
+ * Tenths (10..100) → Letterboxd stars, rounded to the nearest half star.
+ * The inverse of `starsToTenths`, and lossy by design: Letterboxd only stores
+ * half-star increments, so 8.7 lands on 4.5★ and 6.4 on 3★.
+ */
+export function tenthsToStars(tenths: number): number {
+  const stars = Math.round(tenths / 10) / 2;
+  return Math.min(5, Math.max(0.5, stars));
+}
+
+/** Letterboxd's CSV wants "4.5", not "4.50". */
+export function formatStars(tenths: number): string {
+  const stars = tenthsToStars(tenths);
+  return Number.isInteger(stars) ? String(stars) : stars.toFixed(1);
+}
+
 export function parseLetterboxdCsv(text: string, filename: string): { kind: LetterboxdKind; rows: ImportRow[] } | null {
   const parsed = Papa.parse<Record<string, string>>(text, {
     header: true,

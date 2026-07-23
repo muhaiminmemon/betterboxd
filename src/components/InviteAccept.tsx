@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { errorFrom } from "@/lib/http";
 
 export default function InviteAccept({
   token,
@@ -23,13 +24,14 @@ export default function InviteAccept({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error);
+        setError(await errorFrom(res, "Couldn't accept that invite."));
         return;
       }
       router.push(`/${friendUsername}`);
       router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setBusy(false);
     }

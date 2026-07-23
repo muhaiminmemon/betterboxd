@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       .limit(1)
   )[0];
   if (!request) {
-    return NextResponse.json({ error: "Request not found — it may have been withdrawn." }, { status: 404 });
+    return NextResponse.json({ error: "Request not found. It may have been withdrawn." }, { status: 404 });
   }
 
   if (parsed.data.action === "accept") {

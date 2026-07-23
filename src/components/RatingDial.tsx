@@ -6,17 +6,15 @@ import { formatTenths, parseRatingInput, RATING_ANCHORS } from "@/lib/format";
 type Props = {
   /** current value in tenths (10..100), or null for no rating */
   value: number | null;
-  onCommit: (tenths: number | null) => void;
+  onCommit: (tenths: number) => void;
   busy?: boolean;
-  /** show the “watched — no rating” action */
-  allowNoRating?: boolean;
 };
 
 /**
- * The rating dial. One tap on an integer records n.0 — done. The decimal
+ * The rating dial. One tap on an integer records n.0, and that's it. The decimal
  * strip beneath is optional refinement. Full keyboard entry: type 8.7, Enter.
  */
-export default function RatingDial({ value, onCommit, busy, allowNoRating = true }: Props) {
+export default function RatingDial({ value, onCommit, busy }: Props) {
   const [draft, setDraft] = useState<string | null>(null);
   const [showAnchors, setShowAnchors] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,7 +56,7 @@ export default function RatingDial({ value, onCommit, busy, allowNoRating = true
             type="text"
             inputMode="decimal"
             aria-label="Rating, 1.0 to 10.0"
-            placeholder="—"
+            placeholder=""
             value={display}
             disabled={busy}
             onChange={(e) => setDraft(e.target.value)}
@@ -66,7 +64,8 @@ export default function RatingDial({ value, onCommit, busy, allowNoRating = true
             onBlur={commitDraft}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                commitDraft();
+                // blur alone commits; calling commitDraft here too would fire
+                // onCommit twice off the same stale draft, logging the film twice
                 inputRef.current?.blur();
               } else if (e.key === "ArrowUp") {
                 e.preventDefault();
@@ -151,18 +150,6 @@ export default function RatingDial({ value, onCommit, busy, allowNoRating = true
         })}
       </div>
 
-      {allowNoRating && (
-        <div className="mt-3 flex gap-4 text-sm">
-          <button
-            type="button"
-            disabled={busy || value === null}
-            onClick={() => onCommit(null)}
-            className="text-ash hover:text-paper disabled:opacity-40"
-          >
-            Remove rating
-          </button>
-        </div>
-      )}
     </div>
   );
 }

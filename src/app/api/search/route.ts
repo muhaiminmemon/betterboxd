@@ -53,7 +53,7 @@ export async function GET(req: Request) {
       results.push({ tmdbId: f.tmdbId, title: f.title, year: f.year, posterPath: f.posterPath });
     }
   } catch {
-    // pg_trgm not installed yet — TMDB results alone are fine
+    // pg_trgm not installed yet, so TMDB results alone are fine
   }
 
   return NextResponse.json({ results: results.slice(0, 12) });

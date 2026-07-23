@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { errorFrom, readJson } from "@/lib/http";
 import Avatar from "./Avatar";
 
 type Friend = {
@@ -43,50 +44,91 @@ export default function FriendsPanel({ me, friends, incoming, outgoing }: Props)
   const router = useRouter();
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /** One mutation at a time, and never silently. */
+  async function act(fn: () => Promise<Response>, fallback: string) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fn();
+      if (!res.ok) {
+        setError(await errorFrom(res, fallback));
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function getInvite() {
-    const res = await fetch("/api/friends/invite", { method: "POST" });
-    const data = await res.json();
-    if (res.ok) setInviteUrl(data.url);
+    setError(null);
+    const res = await fetch("/api/friends/invite", { method: "POST" }).catch(() => null);
+    if (!res?.ok) {
+      setError(res ? await errorFrom(res, "Couldn't make an invite link.") : "Couldn't reach the server.");
+      return;
+    }
+    const data = await readJson<{ url: string }>(res);
+    if (data.url) setInviteUrl(data.url);
   }
 
   async function copy() {
     if (!inviteUrl) return;
-    await navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Couldn't copy. Select the link and copy it manually.");
+    }
   }
 
-  async function respond(requestId: string, action: "accept" | "decline") {
-    await fetch("/api/friends/respond", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestId, action }),
-    });
-    router.refresh();
-  }
+  const respond = (requestId: string, action: "accept" | "decline") =>
+    act(
+      () =>
+        fetch("/api/friends/respond", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestId, action }),
+        }),
+      action === "accept" ? "Couldn't accept that request." : "Couldn't decline that request.",
+    );
 
-  async function cancel(userId: string) {
-    await fetch("/api/friends/request", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
-    });
-    router.refresh();
-  }
+  const cancel = (userId: string) =>
+    act(
+      () =>
+        fetch("/api/friends/request", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        }),
+      "Couldn't cancel that request.",
+    );
 
   async function remove(friend: Friend) {
-    await fetch("/api/friends", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: friend.id }),
-    });
-    router.refresh();
+    const label = friend.displayName ?? friend.username;
+    if (!window.confirm(`Remove ${label} as a friend? You can send a new request later.`)) return;
+    await act(
+      () =>
+        fetch("/api/friends", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: friend.id }),
+        }),
+      "Couldn't remove that friend.",
+    );
   }
 
   return (
     <div>
       <PeopleSearch onChanged={() => router.refresh()} />
+
+      {error && <p className="mt-4 text-sm text-warn">{error}</p>}
 
       {incoming.length > 0 && (
         <section className="mt-8">
@@ -104,14 +146,16 @@ export default function FriendsPanel({ me, friends, incoming, outgoing }: Props)
                 <button
                   type="button"
                   onClick={() => respond(r.requestId, "accept")}
-                  className="rounded-card bg-paper px-3 py-1.5 text-sm font-medium text-carbon hover:bg-white"
+                  disabled={busy}
+                  className="rounded-card bg-paper px-3 py-1.5 text-sm font-medium text-carbon hover:bg-white disabled:opacity-50"
                 >
                   Accept
                 </button>
                 <button
                   type="button"
                   onClick={() => respond(r.requestId, "decline")}
-                  className="text-sm text-ash hover:text-warn"
+                  disabled={busy}
+                  className="text-sm text-ash hover:text-warn disabled:opacity-50"
                 >
                   Decline
                 </button>
@@ -135,7 +179,8 @@ export default function FriendsPanel({ me, friends, incoming, outgoing }: Props)
                 <button
                   type="button"
                   onClick={() => cancel(r.userId)}
-                  className="text-xs text-ash hover:text-warn"
+                  disabled={busy}
+                  className="text-xs text-ash hover:text-warn disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -173,7 +218,8 @@ export default function FriendsPanel({ me, friends, incoming, outgoing }: Props)
                 <button
                   type="button"
                   onClick={() => remove(f)}
-                  className="text-sm text-ash hover:text-warn"
+                  disabled={busy}
+                  className="text-sm text-ash hover:text-warn disabled:opacity-50"
                 >
                   Remove
                 </button>
@@ -186,7 +232,7 @@ export default function FriendsPanel({ me, friends, incoming, outgoing }: Props)
       <section className="mt-10 rounded-card border border-seam bg-tray p-4">
         <h2 className="text-paper">Or share an invite link</h2>
         <p className="mt-1 text-sm text-ash">
-          For friends who aren&apos;t here yet — the link takes them through signup straight to
+          For friends who aren&apos;t here yet. The link takes them through signup straight to
           being friends with you.
         </p>
         {inviteUrl ? (
@@ -224,35 +270,47 @@ function PeopleSearch({ onChanged }: { onChanged: () => void }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<PersonResult[]>([]);
   const [sent, setSent] = useState<Set<string>>(new Set());
+  const [addError, setAddError] = useState<string | null>(null);
 
   useEffect(() => {
     const query = q.trim();
+    // abort so a stale response can't replace results for a newer query
+    const ac = new AbortController();
     const t = setTimeout(async () => {
       if (query.length < 2) {
         setResults([]);
         return;
       }
       try {
-        const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, {
+          signal: ac.signal,
+        });
+        const data = await readJson<{ results: PersonResult[] }>(res);
+        if (ac.signal.aborted) return;
         setResults(data.results ?? []);
       } catch {
-        setResults([]);
+        if (!ac.signal.aborted) setResults([]);
       }
     }, 250);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
   }, [q]);
 
   async function add(userId: string) {
+    setAddError(null);
     const res = await fetch("/api/friends/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
-    });
-    if (res.ok) {
-      setSent((s) => new Set(s).add(userId));
-      onChanged();
+    }).catch(() => null);
+    if (!res?.ok) {
+      setAddError(res ? await errorFrom(res, "Couldn't send that request.") : "Couldn't reach the server.");
+      return;
     }
+    setSent((s) => new Set(s).add(userId));
+    onChanged();
   }
 
   return (
@@ -291,6 +349,7 @@ function PeopleSearch({ onChanged }: { onChanged: () => void }) {
           ))}
         </ul>
       )}
+      {addError && <p className="mt-2 text-sm text-warn">{addError}</p>}
     </section>
   );
 }

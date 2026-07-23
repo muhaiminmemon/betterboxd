@@ -18,16 +18,22 @@ export default async function ListsPage() {
     .where(eq(listMembers.userId, user.id));
   const roleById = new Map(memberships.map((m) => [m.listId, m.role]));
 
+  // Counted with a join rather than a correlated subquery: inside a raw `sql`
+  // fragment Drizzle emits bare column names, and `"id"` there binds to
+  // list_items' own id, so every list came back as 0.
   const myLists = memberships.length
     ? await db
         .select({
           id: lists.id,
           title: lists.title,
           description: lists.description,
-          count: sql<number>`(select count(*)::int from ${listItems} where ${listItems.listId} = ${lists.id})`,
+          createdAt: lists.createdAt,
+          count: sql<number>`count(${listItems.id})::int`,
         })
         .from(lists)
+        .leftJoin(listItems, eq(listItems.listId, lists.id))
         .where(inArray(lists.id, memberships.map((m) => m.listId)))
+        .groupBy(lists.id, lists.title, lists.description, lists.createdAt)
         .orderBy(desc(lists.createdAt))
     : [];
 
@@ -37,7 +43,7 @@ export default async function ListsPage() {
       <NewListForm />
       {myLists.length === 0 ? (
         <p className="mt-6 text-ash">
-          No lists yet. Make one, or save a pick from “What should we watch?” — that starts a
+          No lists yet. Make one, or save a pick from “What should we watch?”, which starts a
           shared list automatically.
         </p>
       ) : (

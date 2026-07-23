@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, status: "friends" });
   }
 
-  // they already asked — this is mutual interest, so become friends
+  // they already asked, so this is mutual interest: become friends
   const reverse = (
     await db
       .select()

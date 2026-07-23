@@ -9,8 +9,8 @@ type SortMode = "newest" | "oldest" | "rating-desc" | "rating-asc" | "title";
 const SORT_LABELS: Record<SortMode, string> = {
   newest: "Newest first",
   oldest: "Oldest first",
-  "rating-desc": "Rating — high to low",
-  "rating-asc": "Rating — low to high",
+  "rating-desc": "Rating, high to low",
+  "rating-asc": "Rating, low to high",
   title: "Title A–Z",
 };
 

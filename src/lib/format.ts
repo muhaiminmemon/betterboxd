@@ -12,8 +12,18 @@ export function parseRatingInput(raw: string): number | null {
   return Math.round(n * 10);
 }
 
+/**
+ * Today as YYYY-MM-DD in the *viewer's* timezone. `toISOString()` would give
+ * the UTC date, which pre-fills tomorrow for anyone west of Greenwich logging
+ * in the evening.
+ */
+export function todayLocalISO(d: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export const RATING_ANCHORS: { range: string; meaning: string }[] = [
-  { range: "9.0–10.0", meaning: "Exceptional — a personal favourite" },
+  { range: "9.0–10.0", meaning: "Exceptional: a personal favourite" },
   { range: "8.0–8.9", meaning: "Great" },
   { range: "7.0–7.9", meaning: "Good" },
   { range: "6.0–6.9", meaning: "Decent" },

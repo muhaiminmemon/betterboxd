@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { errorFrom } from "@/lib/http";
 
 export type Relationship =
   | { kind: "friends" }
@@ -26,72 +27,112 @@ export default function ProfileActions({
   const router = useRouter();
   const [reported, setReported] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function act(fn: () => Promise<Response>) {
+  async function act(fn: () => Promise<Response>, fallback: string) {
+    if (busy) return false;
     setBusy(true);
+    setError(null);
     try {
-      await fn();
+      const res = await fn();
+      if (!res.ok) {
+        setError(await errorFrom(res, fallback));
+        return false;
+      }
       router.refresh();
+      return true;
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+      return false;
     } finally {
       setBusy(false);
     }
   }
 
   const sendRequest = () =>
-    act(() =>
-      fetch("/api/friends/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: profileId }),
-      }),
+    act(
+      () =>
+        fetch("/api/friends/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: profileId }),
+        }),
+      "Couldn't send that friend request.",
     );
 
   const cancelRequest = () =>
-    act(() =>
-      fetch("/api/friends/request", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: profileId }),
-      }),
+    act(
+      () =>
+        fetch("/api/friends/request", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: profileId }),
+        }),
+      "Couldn't cancel that request.",
     );
 
   const respond = (requestId: string, action: "accept" | "decline") =>
-    act(() =>
-      fetch("/api/friends/respond", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, action }),
-      }),
+    act(
+      () =>
+        fetch("/api/friends/respond", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestId, action }),
+        }),
+      action === "accept" ? "Couldn't accept that request." : "Couldn't decline that request.",
     );
 
-  const removeFriend = () =>
-    act(() =>
-      fetch("/api/friends", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: profileId }),
-      }),
+  async function removeFriend() {
+    if (!window.confirm(`Remove ${profileUsername} as a friend? You can send a new request later.`))
+      return;
+    await act(
+      () =>
+        fetch("/api/friends", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: profileId }),
+        }),
+      "Couldn't remove that friend.",
     );
+  }
 
   async function block() {
     if (!window.confirm(`Block ${profileUsername}? You won't see each other's profiles.`)) return;
-    await fetch("/api/blocks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: profileId }),
-    });
-    router.push("/library");
-    router.refresh();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/blocks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: profileId }),
+      });
+      if (!res.ok) {
+        setError(await errorFrom(res, "Couldn't block that person."));
+        return;
+      }
+      router.push("/library");
+      router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function report() {
     const reason = window.prompt("What's wrong? A sentence is enough.");
     if (!reason) return;
-    await fetch("/api/report", {
+    setError(null);
+    const res = await fetch("/api/report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subjectType: "user", subjectId: profileId, reason }),
-    });
+    }).catch(() => null);
+    if (!res?.ok) {
+      setError(res ? await errorFrom(res, "Couldn't send that report.") : "Couldn't reach the server.");
+      return;
+    }
     setReported(true);
   }
 
@@ -148,12 +189,18 @@ export default function ProfileActions({
           </button>
         </>
       )}
-      <button type="button" onClick={block} className="text-ash hover:text-warn">
+      <button
+        type="button"
+        onClick={block}
+        disabled={busy}
+        className="text-ash hover:text-warn disabled:opacity-50"
+      >
         Block
       </button>
       <button type="button" onClick={report} disabled={reported} className="text-ash hover:text-paper disabled:opacity-60">
         {reported ? "Reported" : "Report"}
       </button>
+      {error && <p className="w-full text-sm text-warn">{error}</p>}
     </div>
   );
 }

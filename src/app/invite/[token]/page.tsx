@@ -27,12 +27,12 @@ export default async function InvitePage(ctx: { params: Promise<{ token: string 
     <div className="mx-auto max-w-md py-16 text-center">
       <h1 className="display text-2xl">{name} wants to be film friends</h1>
       <p className="mt-3 text-ash">
-        Accepting makes the friendship mutual — you can each see the other&apos;s diary and find
+        Accepting makes the friendship mutual, so you can each see the other&apos;s diary and find
         films to watch together. Either of you can end it later.
       </p>
       {viewer ? (
         viewer.username === invite.username ? (
-          <p className="mt-6 text-ash">This is your own invite link — send it to someone else.</p>
+          <p className="mt-6 text-ash">This is your own invite link. Send it to someone else.</p>
         ) : (
           <InviteAccept token={token} friendUsername={invite.username} />
         )

@@ -38,7 +38,7 @@ export async function ensureFilm(movie: TmdbMovie): Promise<Film> {
     .onConflictDoNothing({ target: films.tmdbId })
     .returning();
   if (inserted[0]) return inserted[0];
-  // lost a race — the row exists now
+  // lost a race, so the row exists now
   const won = await db.select().from(films).where(eq(films.tmdbId, movie.id)).limit(1);
   return won[0];
 }

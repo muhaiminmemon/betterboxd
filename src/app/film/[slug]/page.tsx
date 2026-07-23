@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { diaryEntries, films, listMembers, lists, watchlist } from "@/db/schema";
+import { diaryEntries, films, listItems, listMembers, lists, watchlist } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { hydrateFilm } from "@/lib/films";
 import PosterImg from "@/components/PosterImg";
@@ -56,7 +56,7 @@ export default async function FilmPage(ctx: {
       )[0]
     : undefined;
 
-  let editableLists: { id: string; title: string }[] = [];
+  let editableLists: { id: string; title: string; hasFilm: boolean }[] = [];
   if (user) {
     const memberships = await db
       .select({ listId: listMembers.listId })
@@ -65,10 +65,20 @@ export default async function FilmPage(ctx: {
         and(eq(listMembers.userId, user.id), inArray(listMembers.role, ["owner", "editor"])),
       );
     if (memberships.length) {
-      editableLists = await db
+      const listIds = memberships.map((m) => m.listId);
+      const rows = await db
         .select({ id: lists.id, title: lists.title })
         .from(lists)
-        .where(inArray(lists.id, memberships.map((m) => m.listId)));
+        .where(inArray(lists.id, listIds))
+        .orderBy(asc(lists.title));
+      // which of them already hold this film, so the panel can say so
+      // rather than offering an "add" that silently does nothing
+      const containing = await db
+        .select({ listId: listItems.listId })
+        .from(listItems)
+        .where(and(inArray(listItems.listId, listIds), eq(listItems.filmId, film.id)));
+      const has = new Set(containing.map((c) => c.listId));
+      editableLists = rows.map((r) => ({ ...r, hasFilm: has.has(r.id) }));
     }
   }
 
@@ -107,6 +117,7 @@ export default async function FilmPage(ctx: {
                 watchedOn: e.watchedOn,
                 rating: e.rating,
                 rewatch: e.rewatch,
+                hasReview: Boolean(e.review),
                 createdAt: e.createdAt.toISOString(),
               }))}
               currentRatedEntryId={currentRated?.id ?? null}

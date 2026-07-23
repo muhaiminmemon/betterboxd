@@ -251,7 +251,7 @@ function nameOf(u: User): string {
   return u.displayName ?? u.username;
 }
 
-/** Explanations are templated from real data — never generated. */
+/** Explanations are templated from real data, never generated. */
 function blurbFor(s: Scored, pa: Profile, pb: Profile): string {
   const f = s.film;
   const onA = pa.watchlistFilmIds.has(f.id);
@@ -263,7 +263,7 @@ function blurbFor(s: Scored, pa: Profile, pb: Profile): string {
     const da = pa.directorW.get(f.director) ?? 0;
     const dbb = pb.directorW.get(f.director) ?? 0;
     if (da > 0.2 && dbb > 0.2)
-      return `Directed by ${f.director} — films of theirs rate highly with both of you.`;
+      return `Directed by ${f.director}, whose films rate highly with both of you.`;
     if (da > 0.35 || dbb > 0.35)
       return `Directed by ${f.director}, a favourite of ${nameOf(da > dbb ? pa.user : pb.user)}.`;
   }
@@ -278,7 +278,7 @@ function blurbFor(s: Scored, pa: Profile, pb: Profile): string {
 
   const dec = decadeOf(f.year);
   if (dec && (pa.decadeW.get(dec) ?? 0) > 0.15 && (pb.decadeW.get(dec) ?? 0) > 0.15)
-    return `From the ${dec} — a decade you both come back to.`;
+    return `From the ${dec}, a decade you both come back to.`;
 
   return "Widely loved, and close to films you both rate well.";
 }
@@ -336,7 +336,7 @@ export async function recommendForPair(a: User, b: User): Promise<RecResult> {
 
   let pool = candidates.filter((f) => !shown.has(f.id));
   if (pool.length < 5 && shown.size > 0) {
-    // rotation exhausted — forget what was shown and start over
+    // rotation exhausted: forget what was shown and start over
     await db
       .delete(recEvents)
       .where(and(eq(recEvents.pairKey, key), eq(recEvents.event, "shown")));

@@ -23,7 +23,7 @@ export default function PosterImg({
     return (
       <div
         role="img"
-        aria-label={`${title} — no poster available`}
+        aria-label={`${title}, no poster available`}
         className={`bg-tray text-ash flex items-center justify-center overflow-hidden ${className}`}
       >
         <span className="display text-lg px-1 text-center leading-tight line-clamp-3">

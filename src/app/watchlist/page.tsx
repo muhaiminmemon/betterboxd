@@ -32,7 +32,7 @@ export default async function WatchlistPage() {
       <h1 className="display mb-6 text-2xl">Watchlist</h1>
       {rows.length === 0 ? (
         <p className="text-ash">
-          Nothing saved yet. When you add a film, you can note who recommended it — future you
+          Nothing saved yet. When you add a film, you can note who recommended it, and future you
           will thank you.
         </p>
       ) : (

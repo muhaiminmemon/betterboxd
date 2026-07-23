@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* projection-room graphite — chrome stays quiet, posters carry the color */
+  /* projection-room graphite: chrome stays quiet, posters carry the color */
   --color-carbon: #141417;
   --color-tray: #1c1c21;
   --color-tray-2: #232329;

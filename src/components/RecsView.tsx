@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { posterUrl } from "@/lib/tmdb-urls";
+import { errorFrom, readJson } from "@/lib/http";
 
 type RecFilm = {
   filmId: string;
@@ -30,13 +31,16 @@ export default function RecsView({ friend }: { friend: string }) {
   async function load() {
     setState("loading");
     setError(null);
+    // without this a first "not eligible yet" answer sticks for the session,
+    // even once the user has rated enough films
+    setIneligible(false);
     try {
       const res = await fetch("/api/recs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ friend }),
       });
-      const data: RecResponse = await res.json();
+      const data = (await readJson<Record<string, unknown>>(res)) as RecResponse;
       if ("error" in data) {
         setError(data.error);
         setState("error");
@@ -63,11 +67,19 @@ export default function RecsView({ friend }: { friend: string }) {
   }, []);
 
   async function feedback(film: RecFilm, action: "save" | "seen" | "not_interested") {
-    await fetch("/api/recs/feedback", {
+    setError(null);
+    const res = await fetch("/api/recs/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ friend, filmId: film.filmId, action }),
-    });
+    }).catch(() => null);
+    // don't claim it saved if it didn't
+    if (!res?.ok) {
+      setError(
+        res ? await errorFrom(res, "That didn't save. Try again.") : "Couldn't reach the server.",
+      );
+      return;
+    }
     if (action === "save") {
       setSavedIds((s) => new Set(s).add(film.filmId));
     } else {
@@ -93,7 +105,7 @@ export default function RecsView({ friend }: { friend: string }) {
       <div className="rounded-card border border-seam bg-tray p-5">
         <h2 className="text-paper">Rate or import a few more films first</h2>
         <p className="mt-2 text-sm text-ash">
-          We need at least 20 ratings from each of you — including a handful above 8.0 — to find
+          We need at least 20 ratings from each of you, including a handful above 8.0, to find
           a useful match.
         </p>
         <Link href="/import" className="mt-3 inline-block text-sm text-paper underline">
@@ -105,6 +117,7 @@ export default function RecsView({ friend }: { friend: string }) {
 
   return (
     <div>
+      {error && <p className="mb-4 text-sm text-warn">{error}</p>}
       <ul className="space-y-4">
         {films.map((f) => {
           const poster = posterUrl(f.posterPath, "w154");
@@ -150,7 +163,7 @@ export default function RecsView({ friend }: { friend: string }) {
       </ul>
       {films.length === 0 && (
         <p className="text-ash">
-          Nothing left to suggest right now — log a few more films and come back.
+          Nothing left to suggest right now. Log a few more films and come back.
         </p>
       )}
       <div className="mt-6">
@@ -176,8 +189,26 @@ function RecMenu({
   title: string;
 }) {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (!menuRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("click", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
-    <div className="relative shrink-0">
+    <div ref={menuRef} className="relative shrink-0">
       <button
         type="button"
         aria-label={`Options for ${title}`}

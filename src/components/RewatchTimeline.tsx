@@ -3,7 +3,7 @@ import { formatTenths } from "@/lib/format";
 type Point = { watchedOn: string; rating: number };
 
 /**
- * How a rating moved over time — small, precise, no decoration.
+ * How a rating moved over time: small, precise, no decoration.
  * Renders only when there are two or more dated, rated viewings.
  */
 export default function RewatchTimeline({ points }: { points: Point[] }) {

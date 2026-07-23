@@ -1,5 +1,6 @@
 import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -50,7 +51,11 @@ export async function destroySession(): Promise<void> {
   store.delete(SESSION_COOKIE);
 }
 
-export async function getSessionUser(): Promise<User | null> {
+/**
+ * Deduped per request: the nav and the page both ask for the viewer, and
+ * without `cache` that is two identical session joins on every render.
+ */
+export const getSessionUser = cache(async function getSessionUser(): Promise<User | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -67,7 +72,7 @@ export async function getSessionUser(): Promise<User | null> {
     return null;
   }
   return row.user;
-}
+});
 
 export async function requireUser(): Promise<User> {
   const user = await getSessionUser();

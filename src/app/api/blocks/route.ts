@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { blocks } from "@/db/schema";
+import { blocks, friendRequests } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { removeFriendship } from "@/lib/social";
 
@@ -23,6 +23,22 @@ export async function POST(req: Request) {
     .onConflictDoNothing();
   // blocking ends the friendship too
   await removeFriendship(user.id, parsed.data.userId);
+  // and drops any request still pending in either direction, so a blocked
+  // person can't sit in the other's inbox
+  await db
+    .delete(friendRequests)
+    .where(
+      or(
+        and(
+          eq(friendRequests.fromId, user.id),
+          eq(friendRequests.toId, parsed.data.userId),
+        ),
+        and(
+          eq(friendRequests.fromId, parsed.data.userId),
+          eq(friendRequests.toId, user.id),
+        ),
+      ),
+    );
 
   return NextResponse.json({ ok: true });
 }

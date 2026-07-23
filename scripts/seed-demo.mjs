@@ -221,7 +221,7 @@ async function main() {
   if (theoEntry[0]) {
     await sql`
       update diary_entries set
-        review = 'The twist in the final act recontextualizes literally everything before it — did not see it coming.',
+        review = 'The twist in the final act recontextualizes literally everything before it. Did not see it coming.',
         spoiler = true
       where id = ${theoEntry[0].id}
     `;

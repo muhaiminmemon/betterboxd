@@ -116,7 +116,7 @@ export default async function DiaryPage() {
                         </span>
                       </span>
                       <span className="num w-12 shrink-0 text-right text-paper">
-                        {e.rating !== null ? formatTenths(e.rating) : "—"}
+                        {e.rating !== null ? formatTenths(e.rating) : ""}
                       </span>
                     </li>
                   );

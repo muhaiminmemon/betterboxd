@@ -12,8 +12,8 @@ export default async function Home() {
         Rate films properly.
       </h1>
       <p className="mt-4 max-w-lg text-lg text-ash">
-        A film diary on a 1.0–10.0 scale, in tenths. Forty films don&apos;t share four stars
-        here — <span className="num text-paper">8.7</span> and{" "}
+        A film diary on a 1.0 to 10.0 scale, in tenths. Forty films don&apos;t share four stars
+        here. <span className="num text-paper">8.7</span> and{" "}
         <span className="num text-paper">8.2</span> are different opinions.
       </p>
       <ul className="mt-8 space-y-3 text-ash">
@@ -23,7 +23,7 @@ export default async function Home() {
         </li>
         <li>
           <span className="text-paper">Keep your history honest.</span> Rewatches never overwrite
-          old ratings — watch your taste change over the years.
+          old ratings, so you can watch your taste change over the years.
         </li>
         <li>
           <span className="text-paper">Your data stays yours.</span> Full export, free forever.

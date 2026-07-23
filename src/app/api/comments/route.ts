@@ -41,13 +41,14 @@ export async function POST(req: Request) {
     const author = (
       await db.select().from(users).where(eq(users.id, entry.userId)).limit(1)
     )[0];
-    const perm = author?.commentPermission ?? "friends";
-    if (perm === "off") {
+    if (!author) return NextResponse.json({ error: "Review not found." }, { status: 404 });
+    if (author.commentPermission === "off") {
       return NextResponse.json(
         { error: `${author.displayName ?? author.username} has comments turned off.` },
         { status: 403 },
       );
     }
+    const perm = author.commentPermission;
     if (perm === "friends" && !(await areFriends(user.id, entry.userId))) {
       return NextResponse.json(
         { error: "Only friends can comment on this review." },

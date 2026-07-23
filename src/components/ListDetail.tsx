@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { posterUrl } from "@/lib/tmdb-urls";
+import { errorFrom } from "@/lib/http";
 import type { ListRole } from "@/lib/lists";
 import Avatar from "./Avatar";
 
@@ -40,59 +41,103 @@ export default function ListDetail({ list, items, members, myRole, myUserId }: P
   const [memberName, setMemberName] = useState("");
   const [memberRole, setMemberRole] = useState<"editor" | "viewer">("editor");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  async function saveTitle() {
-    const res = await fetch(`/api/lists/${list.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
-    });
-    if (res.ok) {
-      setRenaming(false);
-      router.refresh();
+  /** One mutation at a time, and never silently. */
+  async function act(fn: () => Promise<Response>, fallback: string) {
+    if (busy) return false;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fn();
+      if (!res.ok) {
+        setError(await errorFrom(res, fallback));
+        return false;
+      }
+      return true;
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+      return false;
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function removeItem(filmId: string) {
-    await fetch(`/api/lists/${list.id}/items`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filmId }),
-    });
+  async function saveTitle() {
+    const ok = await act(
+      () =>
+        fetch(`/api/lists/${list.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        }),
+      "Couldn't rename this list.",
+    );
+    if (!ok) return;
+    setRenaming(false);
     router.refresh();
+  }
+
+  async function removeItem(filmId: string) {
+    const ok = await act(
+      () =>
+        fetch(`/api/lists/${list.id}/items`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filmId }),
+        }),
+      "Couldn't remove that film.",
+    );
+    if (ok) router.refresh();
   }
 
   async function addMember(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    const res = await fetch(`/api/lists/${list.id}/members`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: memberName, role: memberRole }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error);
-      return;
-    }
+    const ok = await act(
+      () =>
+        fetch(`/api/lists/${list.id}/members`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: memberName, role: memberRole }),
+        }),
+      "Couldn't add that person.",
+    );
+    if (!ok) return;
     setMemberName("");
     router.refresh();
   }
 
   async function removeMember(userId: string) {
-    await fetch(`/api/lists/${list.id}/members`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
-    });
-    if (userId === myUserId) {
-      router.push("/lists");
-    }
+    const leaving = userId === myUserId;
+    if (leaving && !window.confirm(`Leave "${list.title}"? You'll lose access to it.`)) return;
+    const ok = await act(
+      () =>
+        fetch(`/api/lists/${list.id}/members`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        }),
+      leaving ? "Couldn't leave this list." : "Couldn't remove that member.",
+    );
+    if (!ok) return;
+    if (leaving) router.push("/lists");
     router.refresh();
   }
 
   async function deleteList() {
-    await fetch(`/api/lists/${list.id}`, { method: "DELETE" });
+    if (
+      !window.confirm(
+        `Delete "${list.title}" for everyone? Its ${items.length} film${
+          items.length === 1 ? "" : "s"
+        } and all members go with it. This can't be undone.`,
+      )
+    )
+      return;
+    const ok = await act(
+      () => fetch(`/api/lists/${list.id}`, { method: "DELETE" }),
+      "Couldn't delete this list.",
+    );
+    if (!ok) return;
     router.push("/lists");
     router.refresh();
   }
@@ -107,7 +152,12 @@ export default function ListDetail({ list, items, members, myRole, myUserId }: P
               onChange={(e) => setTitle(e.target.value)}
               className="min-w-0 flex-1 rounded-card border border-seam bg-tray px-3 py-1.5 text-lg focus:border-beam focus:outline-none"
             />
-            <button type="button" onClick={saveTitle} className="text-sm text-ash hover:text-paper">
+            <button
+              type="button"
+              onClick={saveTitle}
+              disabled={busy}
+              className="text-sm text-ash hover:text-paper disabled:opacity-50"
+            >
               Save
             </button>
           </>
@@ -159,8 +209,9 @@ export default function ListDetail({ list, items, members, myRole, myUserId }: P
                   <button
                     type="button"
                     onClick={() => removeItem(i.filmId)}
+                    disabled={busy}
                     aria-label={`Remove ${i.title} from list`}
-                    className="text-ash hover:text-warn"
+                    className="text-ash hover:text-warn disabled:opacity-50"
                   >
                     ×
                   </button>
@@ -186,7 +237,8 @@ export default function ListDetail({ list, items, members, myRole, myUserId }: P
                 <button
                   type="button"
                   onClick={() => removeMember(m.userId)}
-                  className="text-xs text-ash hover:text-warn"
+                  disabled={busy}
+                  className="text-xs text-ash hover:text-warn disabled:opacity-50"
                 >
                   {m.userId === myUserId ? "Leave" : "Remove"}
                 </button>
@@ -212,7 +264,11 @@ export default function ListDetail({ list, items, members, myRole, myUserId }: P
               <option value="editor">Editor</option>
               <option value="viewer">Viewer</option>
             </select>
-            <button type="submit" className="rounded-card border border-seam px-3 py-1.5 text-sm text-paper hover:bg-tray">
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-card border border-seam px-3 py-1.5 text-sm text-paper hover:bg-tray disabled:opacity-50"
+            >
               Add
             </button>
           </form>
@@ -222,7 +278,12 @@ export default function ListDetail({ list, items, members, myRole, myUserId }: P
 
       {myRole === "owner" && (
         <div className="mt-10 border-t border-seam pt-4">
-          <button type="button" onClick={deleteList} className="text-sm text-ash hover:text-warn">
+          <button
+            type="button"
+            onClick={deleteList}
+            disabled={busy}
+            className="text-sm text-ash hover:text-warn disabled:opacity-50"
+          >
             Delete this list
           </button>
         </div>

@@ -39,11 +39,11 @@ type SortMode =
   | "most-watched";
 
 const SORT_LABELS: Record<SortMode, string> = {
-  rating: "Rating — high to low",
-  "rating-asc": "Rating — low to high",
+  rating: "Rating, high to low",
+  "rating-asc": "Rating, low to high",
   title: "Title A–Z",
-  "year-new": "Year — newest",
-  "year-old": "Year — oldest",
+  "year-new": "Year, newest first",
+  "year-old": "Year, oldest first",
   recent: "Recently watched",
   "most-watched": "Most watched",
 };
@@ -56,7 +56,7 @@ export default function LibraryView({ films, editable }: Props) {
   const [items, setItems] = useState(films);
   const [prevFilms, setPrevFilms] = useState(films);
   if (films !== prevFilms) {
-    // server sent fresh data (rating changed, entry added) — drop local copy
+    // server sent fresh data (rating changed, entry added), so drop local copy
     setPrevFilms(films);
     setItems(films);
   }
@@ -246,7 +246,7 @@ function RankedLedger({
       {unrated.length > 0 && (
         <>
           <li className="mt-6 mb-2 text-xs uppercase tracking-wide text-ash" aria-hidden>
-            Watched — no rating
+            Watched, no rating
           </li>
           {unrated.map((film) => (
             <LedgerRow key={film.filmId} film={film} rank={null} draggable={false} />
@@ -362,7 +362,7 @@ function Shelf({ films }: { films: LibraryFilm[] }) {
               <span className="mt-1.5 flex items-baseline justify-between gap-2">
                 <span className="truncate text-xs text-ash">{film.title}</span>
                 <span className="num text-sm text-paper">
-                  {film.rating !== null ? formatTenths(film.rating) : "—"}
+                  {film.rating !== null ? formatTenths(film.rating) : ""}
                 </span>
               </span>
             </Link>

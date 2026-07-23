@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { errorFrom } from "@/lib/http";
 
 export default function SignupPage() {
   return (
@@ -31,13 +32,14 @@ function SignupForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.toLowerCase(), email, password }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error);
+        setError(await errorFrom(res, "Couldn't create your account. Try again."));
         return;
       }
       router.push(next && next.startsWith("/") ? next : "/import");
       router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setBusy(false);
     }

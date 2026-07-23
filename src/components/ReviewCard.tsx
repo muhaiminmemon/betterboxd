@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { errorFrom } from "@/lib/http";
 import Avatar from "./Avatar";
 
 export type ReviewData = {
@@ -36,37 +37,64 @@ export default function ReviewCard({
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [reported, setReported] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   async function addComment(e: React.FormEvent) {
     e.preventDefault();
+    // without this guard a double-click posts the comment twice
+    if (busy || !body.trim()) return;
+    setBusy(true);
     setError(null);
-    const res = await fetch("/api/comments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entryId: review.id, body }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error);
-      return;
+    try {
+      const res = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entryId: review.id, body: body.trim() }),
+      });
+      if (!res.ok) {
+        setError(await errorFrom(res, "Couldn't post that comment."));
+        return;
+      }
+      setBody("");
+      router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
     }
-    setBody("");
-    router.refresh();
   }
 
   async function deleteComment(id: string) {
-    await fetch(`/api/comments/${id}`, { method: "DELETE" });
-    router.refresh();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/comments/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        setError(await errorFrom(res, "Couldn't delete that comment."));
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function report() {
     const reason = window.prompt("What's wrong with this review?");
     if (!reason) return;
-    await fetch("/api/report", {
+    setError(null);
+    const res = await fetch("/api/report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subjectType: "review", subjectId: review.id, reason }),
-    });
+    }).catch(() => null);
+    if (!res?.ok) {
+      setError(res ? await errorFrom(res, "Couldn't send that report.") : "Couldn't reach the server.");
+      return;
+    }
     setReported(true);
   }
 
@@ -89,7 +117,7 @@ export default function ReviewCard({
           onClick={() => setRevealed(true)}
           className="mt-1.5 rounded-card border border-seam px-3 py-1.5 text-sm text-ash hover:text-paper"
         >
-          This review mentions plot details — show it
+          This review mentions plot details. Show it
         </button>
       )}
       <div className="mt-2 flex items-center gap-3 text-xs text-ash">
@@ -116,7 +144,8 @@ export default function ReviewCard({
                 <button
                   type="button"
                   onClick={() => deleteComment(c.id)}
-                  className="ml-2 text-xs text-ash hover:text-warn"
+                  disabled={busy}
+                  className="ml-2 text-xs text-ash hover:text-warn disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -133,7 +162,11 @@ export default function ReviewCard({
                 maxLength={5000}
                 className="min-w-0 flex-1 rounded-card border border-seam bg-tray px-2 py-1 text-sm placeholder:text-ash focus:border-beam focus:outline-none"
               />
-              <button type="submit" className="text-sm text-ash hover:text-paper">
+              <button
+                type="submit"
+                disabled={busy || !body.trim()}
+                className="text-sm text-ash hover:text-paper disabled:opacity-50"
+              >
                 Post
               </button>
             </form>

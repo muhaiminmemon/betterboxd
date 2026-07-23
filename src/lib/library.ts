@@ -17,7 +17,7 @@ export type LibraryFilm = {
 
 /**
  * Ranked library. A film's current rating comes from its most recent rated
- * entry — an unrated later viewing never erases the last actual rating.
+ * entry, so an unrated later viewing never erases the last actual rating.
  * Equal ratings keep the user's manual order (sort_key), then title.
  */
 export async function getRankedLibrary(

@@ -21,7 +21,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   bio: text("bio"),
-  // data URL (small, client-resized JPEG) — no external storage needed
+  // data URL (small, client-resized JPEG), no external storage needed
   avatarUrl: text("avatar_url"),
   // public | friends | private
   privacy: text("privacy").notNull().default("public"),

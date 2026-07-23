@@ -91,7 +91,7 @@ export default async function FeedPage() {
                   )}
                   {e.review && e.spoiler && (
                     <p className="mt-1 text-xs text-ash">
-                      Review contains spoilers —{" "}
+                      Review contains spoilers.{" "}
                       <Link href={`/film/${e.slug}`} className="underline">
                         read it on the film page
                       </Link>

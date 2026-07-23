@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { errorFrom } from "@/lib/http";
 import Avatar from "./Avatar";
 
 const TARGET_SIZE = 256;
@@ -9,25 +10,32 @@ const TARGET_SIZE = 256;
 function resizeToSquareJpeg(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
     img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = TARGET_SIZE;
-      canvas.height = TARGET_SIZE;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Canvas unavailable"));
-        return;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = TARGET_SIZE;
+        canvas.height = TARGET_SIZE;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas unavailable"));
+          return;
+        }
+        // cover-crop: fill the square, cropping the longer side
+        const scale = TARGET_SIZE / Math.min(img.width, img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, (TARGET_SIZE - w) / 2, (TARGET_SIZE - h) / 2, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      } finally {
+        URL.revokeObjectURL(objectUrl);
       }
-      // cover-crop: fill the square, cropping the longer side
-      const scale = TARGET_SIZE / Math.min(img.width, img.height);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      ctx.drawImage(img, (TARGET_SIZE - w) / 2, (TARGET_SIZE - h) / 2, w, h);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
-      URL.revokeObjectURL(img.src);
     };
-    img.onerror = () => reject(new Error("Couldn't read that image"));
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Couldn't read that image"));
+    };
+    img.src = objectUrl;
   });
 }
 
@@ -63,9 +71,8 @@ export default function AvatarUpload({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dataUrl }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Couldn't save that photo.");
+        setError(await errorFrom(res, "Couldn't save that photo."));
         return;
       }
       setPreview(dataUrl);
@@ -79,12 +86,17 @@ export default function AvatarUpload({
 
   async function remove() {
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch("/api/settings/avatar", { method: "DELETE" });
-      if (res.ok) {
-        setPreview(null);
-        router.refresh();
+      if (!res.ok) {
+        setError(await errorFrom(res, "Couldn't remove that photo."));
+        return;
       }
+      setPreview(null);
+      router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
