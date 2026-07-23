@@ -29,30 +29,135 @@ type Props = {
   editable: boolean;
 };
 
+type SortMode =
+  | "rating"
+  | "rating-asc"
+  | "title"
+  | "year-new"
+  | "year-old"
+  | "recent"
+  | "most-watched";
+
+const SORT_LABELS: Record<SortMode, string> = {
+  rating: "Rating — high to low",
+  "rating-asc": "Rating — low to high",
+  title: "Title A–Z",
+  "year-new": "Year — newest",
+  "year-old": "Year — oldest",
+  recent: "Recently watched",
+  "most-watched": "Most watched",
+};
+
 export default function LibraryView({ films, editable }: Props) {
   const [view, setView] = useState<"ledger" | "shelf">("ledger");
   const [filter, setFilter] = useState("");
+  const [sort, setSort] = useState<SortMode>("rating");
+  const [decade, setDecade] = useState("");
+  const [ratedOnly, setRatedOnly] = useState<"all" | "rated" | "unrated">("all");
   const [items, setItems] = useState(films);
+  const [prevFilms, setPrevFilms] = useState(films);
+  if (films !== prevFilms) {
+    // server sent fresh data (rating changed, entry added) — drop local copy
+    setPrevFilms(films);
+    setItems(films);
+  }
+
+  const decades = useMemo(() => {
+    const set = new Set<number>();
+    for (const f of items) if (f.year) set.add(Math.floor(f.year / 10) * 10);
+    return [...set].sort((a, b) => b - a);
+  }, [items]);
 
   const visible = useMemo(() => {
-    const f = filter.trim().toLowerCase();
-    return f ? items.filter((x) => x.title.toLowerCase().includes(f)) : items;
-  }, [items, filter]);
+    const q = filter.trim().toLowerCase();
+    let out = items;
+    if (q) {
+      out = out.filter(
+        (x) =>
+          x.title.toLowerCase().includes(q) ||
+          (x.director ?? "").toLowerCase().includes(q),
+      );
+    }
+    if (decade) {
+      const d = Number(decade);
+      out = out.filter((x) => x.year !== null && Math.floor(x.year / 10) * 10 === d);
+    }
+    if (ratedOnly === "rated") out = out.filter((x) => x.rating !== null);
+    if (ratedOnly === "unrated") out = out.filter((x) => x.rating === null);
 
-  const rated = visible.filter((f) => f.rating !== null);
-  const unrated = visible.filter((f) => f.rating === null);
+    if (sort !== "rating") {
+      out = [...out].sort((a, b) => {
+        switch (sort) {
+          case "rating-asc":
+            return (a.rating ?? 999) - (b.rating ?? 999) || a.title.localeCompare(b.title);
+          case "title":
+            return a.title.localeCompare(b.title);
+          case "year-new":
+            return (b.year ?? -1) - (a.year ?? -1) || a.title.localeCompare(b.title);
+          case "year-old":
+            return (a.year ?? 9999) - (b.year ?? 9999) || a.title.localeCompare(b.title);
+          case "recent":
+            return (b.lastWatched ?? "").localeCompare(a.lastWatched ?? "");
+          case "most-watched":
+            return b.entryCount - a.entryCount || (b.rating ?? 0) - (a.rating ?? 0);
+          default:
+            return 0;
+        }
+      });
+    }
+    return out;
+  }, [items, filter, decade, ratedOnly, sort]);
+
+  // manual tie-reorder only makes sense in the default ranking with nothing hidden
+  const dragEnabled =
+    editable && sort === "rating" && !filter && !decade && ratedOnly === "all";
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <input
           type="search"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter by title"
-          aria-label="Filter library by title"
-          className="w-44 rounded-card border border-seam bg-tray px-3 py-1.5 text-sm placeholder:text-ash focus:border-beam focus:outline-none"
+          placeholder="Filter title or director"
+          aria-label="Filter library"
+          className="w-48 rounded-card border border-seam bg-tray px-3 py-1.5 text-sm placeholder:text-ash focus:border-beam focus:outline-none"
         />
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortMode)}
+          aria-label="Sort by"
+          className="rounded-card border border-seam bg-tray px-2 py-1.5 text-sm text-paper"
+        >
+          {Object.entries(SORT_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={decade}
+          onChange={(e) => setDecade(e.target.value)}
+          aria-label="Decade"
+          className="rounded-card border border-seam bg-tray px-2 py-1.5 text-sm text-paper"
+        >
+          <option value="">Any decade</option>
+          {decades.map((d) => (
+            <option key={d} value={d}>
+              {d}s
+            </option>
+          ))}
+        </select>
+        <select
+          value={ratedOnly}
+          onChange={(e) => setRatedOnly(e.target.value as typeof ratedOnly)}
+          aria-label="Rated filter"
+          className="rounded-card border border-seam bg-tray px-2 py-1.5 text-sm text-paper"
+        >
+          <option value="all">Rated & unrated</option>
+          <option value="rated">Rated only</option>
+          <option value="unrated">No rating yet</option>
+        </select>
         <div className="ml-auto flex rounded-card border border-seam text-sm" role="group" aria-label="View">
           {(["ledger", "shelf"] as const).map((v) => (
             <button
@@ -70,14 +175,14 @@ export default function LibraryView({ films, editable }: Props) {
         </div>
       </div>
 
-      {view === "ledger" ? (
-        <Ledger
-          rated={rated}
-          unrated={unrated}
-          editable={editable && !filter}
-          onReorder={setItems}
-          all={items}
-        />
+      {visible.length === 0 ? (
+        <p className="py-8 text-sm text-ash">No films match those filters.</p>
+      ) : view === "ledger" ? (
+        dragEnabled ? (
+          <RankedLedger films={visible} onReorder={setItems} all={items} />
+        ) : (
+          <FlatLedger films={visible} showRank={sort === "rating"} />
+        )
       ) : (
         <Shelf films={visible} />
       )}
@@ -85,25 +190,24 @@ export default function LibraryView({ films, editable }: Props) {
   );
 }
 
-function Ledger({
-  rated,
-  unrated,
-  editable,
+/** Default ranking view: tie groups are drag-reorderable. */
+function RankedLedger({
+  films,
   onReorder,
   all,
 }: {
-  rated: LibraryFilm[];
-  unrated: LibraryFilm[];
-  editable: boolean;
+  films: LibraryFilm[];
   onReorder: (items: LibraryFilm[]) => void;
   all: LibraryFilm[];
 }) {
+  const rated = films.filter((f) => f.rating !== null);
+  const unrated = films.filter((f) => f.rating === null);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // tie groups: runs of equal ratings, in display order
   const groups = useMemo(() => {
     const out: LibraryFilm[][] = [];
     for (const f of rated) {
@@ -144,14 +248,9 @@ function Ledger({
           return { film, rank };
         });
         const content = rows.map(({ film, rank }) => (
-          <LedgerRow
-            key={film.filmId}
-            film={film}
-            rank={rank}
-            draggable={editable && tie}
-          />
+          <LedgerRow key={film.filmId} film={film} rank={rank} draggable={tie} />
         ));
-        return editable && tie ? (
+        return tie ? (
           <DndContext
             key={group[0].filmId}
             sensors={sensors}
@@ -183,6 +282,22 @@ function Ledger({
   );
 }
 
+/** Any other sort/filter combination: a plain list, no drag. */
+function FlatLedger({ films, showRank }: { films: LibraryFilm[]; showRank: boolean }) {
+  return (
+    <ol className="fade-up">
+      {films.map((film, i) => (
+        <LedgerRow
+          key={film.filmId}
+          film={film}
+          rank={showRank ? i + 1 : null}
+          draggable={false}
+        />
+      ))}
+    </ol>
+  );
+}
+
 function LedgerRow({
   film,
   rank,
@@ -203,8 +318,8 @@ function LedgerRow({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`group flex items-center gap-3 border-b border-seam py-2 ${
-        isDragging ? "z-10 bg-tray-2 relative rounded-card" : ""
+      className={`group flex items-center gap-3 border-b border-seam py-2 transition-colors ${
+        isDragging ? "z-10 bg-tray-2 relative rounded-card" : "hover:bg-tray/50"
       }`}
     >
       <span className="num w-8 shrink-0 text-right text-xs text-ash">
@@ -236,7 +351,7 @@ function LedgerRow({
           {...attributes}
           {...listeners}
           aria-label={`Reorder ${film.title} within its rating group`}
-          className="cursor-grab touch-none px-1 text-seam opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-ash active:cursor-grabbing"
+          className="cursor-grab touch-none px-1 text-seam opacity-60 transition-opacity hover:text-ash focus-visible:opacity-100 active:cursor-grabbing sm:opacity-0 sm:group-hover:opacity-100"
         >
           ⠿
         </button>

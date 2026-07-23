@@ -55,6 +55,12 @@ export default function SearchBox() {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onFocus={() => (results.length || people.length) && setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setOpen(false);
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
         placeholder="Find a film or person"
         aria-label="Find a film or person"
         className="w-40 sm:w-56 rounded-card border border-seam bg-tray px-3 py-1.5 text-sm placeholder:text-ash focus:border-beam focus:outline-none"

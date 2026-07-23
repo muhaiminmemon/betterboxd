@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
 import SearchBox from "./SearchBox";
 import SignOutButton from "./SignOutButton";
+import NavLinks from "./NavLinks";
 
 export default async function Nav() {
   const user = await getSessionUser();
@@ -14,15 +15,7 @@ export default async function Nav() {
         </Link>
         {user ? (
           <>
-            <nav aria-label="Main" className="flex flex-wrap items-center gap-4 text-sm text-ash">
-              <Link href="/library" className="hover:text-paper">Library</Link>
-              <Link href="/diary" className="hover:text-paper">Diary</Link>
-              <Link href="/feed" className="hover:text-paper">Feed</Link>
-              <Link href="/watchlist" className="hover:text-paper">Watchlist</Link>
-              <Link href="/lists" className="hover:text-paper">Lists</Link>
-              <Link href="/friends" className="hover:text-paper">Friends</Link>
-              <Link href="/import" className="hover:text-paper">Import</Link>
-            </nav>
+            <NavLinks />
             <div className="ml-auto flex items-center gap-3">
               <SearchBox />
               <Link
