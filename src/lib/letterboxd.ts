@@ -15,6 +15,16 @@ export type ImportRow = {
   rewatch: boolean;
 };
 
+/**
+ * Letterboxd writes plain YYYY-MM-DD. Anything else is dropped rather than
+ * handed to Postgres, which would reject the whole insert.
+ */
+function isoDate(raw: string | undefined): string | null {
+  const s = raw?.trim();
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  return s;
+}
+
 export function detectKind(headers: string[], filename: string): LetterboxdKind | null {
   const set = new Set(headers);
   if (set.has("Watched Date")) return "diary";
@@ -68,7 +78,16 @@ export function parseLetterboxdCsv(text: string, filename: string): { kind: Lett
     year: r["Year"] ? Number(r["Year"]) || null : null,
     uri: r["Letterboxd URI"]?.trim() || null,
     rating: kind === "diary" || kind === "ratings" ? starsToTenths(r["Rating"]) : null,
-    watchedOn: kind === "diary" ? r["Watched Date"]?.trim() || null : null,
+    // diary.csv has both: "Watched Date" is when you saw it, "Date" when you
+    // logged it. ratings.csv and watched.csv only carry "Date", which is the
+    // best date available for those rows, so use it rather than importing
+    // everything undated.
+    watchedOn:
+      kind === "watchlist"
+        ? null
+        : kind === "diary"
+          ? isoDate(r["Watched Date"]) ?? isoDate(r["Date"])
+          : isoDate(r["Date"]),
     rewatch: kind === "diary" ? (r["Rewatch"] ?? "").trim().toLowerCase() === "yes" : false,
   }));
 

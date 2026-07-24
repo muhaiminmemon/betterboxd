@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { films, listItems, listMembers, lists, users } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { roleIn, type ListRole } from "@/lib/lists";
+import { getRankedLibrary } from "@/lib/library";
 import ListDetail from "@/components/ListDetail";
 
 export default async function ListPage(ctx: { params: Promise<{ id: string }> }) {
@@ -24,11 +25,18 @@ export default async function ListPage(ctx: { params: Promise<{ id: string }> })
       slug: films.slug,
       posterPath: films.posterPath,
       director: films.director,
+      note: listItems.note,
+      addedBy: listItems.addedBy,
+      addedByName: users.displayName,
+      addedByUsername: users.username,
+      addedByAvatar: users.avatarUrl,
     })
     .from(listItems)
     .innerJoin(films, eq(films.id, listItems.filmId))
+    .leftJoin(users, eq(users.id, listItems.addedBy))
     .where(eq(listItems.listId, id))
-    .orderBy(asc(listItems.createdAt));
+    // the order people dragged into; untouched rows keep insertion order
+    .orderBy(asc(listItems.position), asc(listItems.createdAt));
 
   const members = await db
     .select({
@@ -42,6 +50,9 @@ export default async function ListPage(ctx: { params: Promise<{ id: string }> })
     .innerJoin(users, eq(users.id, listMembers.userId))
     .where(eq(listMembers.listId, id));
 
+  // the viewer's own library is the source for bulk-add
+  const library = await getRankedLibrary(user.id);
+
   return (
     <ListDetail
       list={{ id: list.id, title: list.title, description: list.description }}
@@ -49,6 +60,13 @@ export default async function ListPage(ctx: { params: Promise<{ id: string }> })
       members={members}
       myRole={role as ListRole}
       myUserId={user.id}
+      libraryFilms={library.map((f) => ({
+        filmId: f.filmId,
+        title: f.title,
+        year: f.year,
+        posterPath: f.posterPath,
+        rating: f.rating,
+      }))}
     />
   );
 }

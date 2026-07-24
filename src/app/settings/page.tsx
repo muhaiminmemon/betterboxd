@@ -5,6 +5,7 @@ import { blocks, users } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import SettingsForm from "@/components/SettingsForm";
 import BlockedList from "@/components/BlockedList";
+import SignOutButton from "@/components/SignOutButton";
 
 export const metadata = { title: "Settings" };
 
@@ -70,6 +71,11 @@ export default async function SettingsPage() {
         <p className="mt-2 text-xs text-ash">
           On Letterboxd: Settings → Import &amp; Export → Import Diary.
         </p>
+      </section>
+
+      {/* the nav's sign-out is desktop-only, so this is the way out on a phone */}
+      <section className="mt-10 border-t border-seam pt-6">
+        <SignOutButton />
       </section>
     </div>
   );

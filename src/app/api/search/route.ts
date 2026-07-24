@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { films } from "@/db/schema";
+import { getSessionUser } from "@/lib/auth";
 import { releaseYear, searchMovies, TmdbError } from "@/lib/tmdb";
 
 export type SearchResult = {
@@ -9,6 +10,11 @@ export type SearchResult = {
   title: string;
   year: number | null;
   posterPath: string | null;
+  /** present once the film is in the local catalogue, so we can link directly */
+  slug?: string | null;
+  director?: string | null;
+  /** the viewer's current rating, when they've rated it */
+  rating?: number | null;
 };
 
 /** TMDB search merged with the local catalogue (pg_trgm handles typos). */
@@ -42,6 +48,8 @@ export async function GET(req: Request) {
         title: films.title,
         year: films.year,
         posterPath: films.posterPath,
+        slug: films.slug,
+        director: films.director,
       })
       .from(films)
       .where(sql`similarity(${films.title}, ${q}) > 0.3`)
@@ -50,10 +58,54 @@ export async function GET(req: Request) {
     for (const f of local) {
       if (f.tmdbId === null || seen.has(f.tmdbId)) continue;
       seen.add(f.tmdbId);
-      results.push({ tmdbId: f.tmdbId, title: f.title, year: f.year, posterPath: f.posterPath });
+      results.push(f as SearchResult);
     }
   } catch {
     // pg_trgm not installed yet, so TMDB results alone are fine
+  }
+
+  // Fill in slug/director for TMDB hits we already hold, and the viewer's own
+  // rating, so the palette can show what they thought without a second trip.
+  const tmdbIds = results.map((r) => r.tmdbId);
+  if (tmdbIds.length) {
+    const user = await getSessionUser();
+    const known = await db
+      .select({
+        tmdbId: films.tmdbId,
+        id: films.id,
+        slug: films.slug,
+        director: films.director,
+      })
+      .from(films)
+      .where(inArray(films.tmdbId, tmdbIds));
+
+    const byTmdb = new Map(known.map((k) => [k.tmdbId, k]));
+    let ratingByFilm = new Map<string, number>();
+
+    if (user && known.length) {
+      const rated = await db.execute(sql`
+        select distinct on (film_id) film_id, rating
+        from diary_entries
+        where user_id = ${user.id}
+          and rating is not null
+          and film_id in (${sql.join(known.map((k) => sql`${k.id}`), sql`, `)})
+        order by film_id, watched_on desc nulls last, created_at desc
+      `);
+      ratingByFilm = new Map(
+        (rated as unknown as Record<string, unknown>[]).map((r) => [
+          r.film_id as string,
+          r.rating as number,
+        ]),
+      );
+    }
+
+    for (const r of results) {
+      const k = byTmdb.get(r.tmdbId);
+      if (!k) continue;
+      r.slug = k.slug;
+      r.director = r.director ?? k.director;
+      r.rating = ratingByFilm.get(k.id) ?? null;
+    }
   }
 
   return NextResponse.json({ results: results.slice(0, 12) });

@@ -72,6 +72,23 @@ export async function popularMovies(page: number): Promise<TmdbMovie[]> {
   return data.results ?? [];
 }
 
+/**
+ * The year's best, as TMDB sees it. Ranked by vote count rather than raw
+ * popularity so a film people actually watched beats one that merely trended,
+ * and gated on a vote floor so a January release with four votes can't lead.
+ */
+export async function topMoviesOfYear(year: number, page = 1): Promise<TmdbMovie[]> {
+  const data = await tmdb<{ results: TmdbMovie[] }>("/discover/movie", {
+    "primary_release_date.gte": `${year}-01-01`,
+    "primary_release_date.lte": `${year}-12-31`,
+    sort_by: "vote_count.desc",
+    "vote_count.gte": "100",
+    include_adult: "false",
+    page: String(page),
+  });
+  return data.results ?? [];
+}
+
 export async function discoverByGenre(genreId: number, page: number): Promise<TmdbMovie[]> {
   const data = await tmdb<{ results: TmdbMovie[] }>("/discover/movie", {
     with_genres: String(genreId),

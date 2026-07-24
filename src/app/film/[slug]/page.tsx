@@ -7,6 +7,7 @@ import { getSessionUser } from "@/lib/auth";
 import { hydrateFilm } from "@/lib/films";
 import PosterImg from "@/components/PosterImg";
 import FilmPanel from "@/components/FilmPanel";
+import FilmStickyHeader from "@/components/FilmStickyHeader";
 import RewatchTimeline from "@/components/RewatchTimeline";
 import ReviewsSection from "@/components/ReviewsSection";
 
@@ -82,8 +83,17 @@ export default async function FilmPage(ctx: {
     }
   }
 
+  const meta = [film.runtime ? `${film.runtime} min` : null, film.genres?.[0]]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <div className="flex flex-col gap-8 md:flex-row">
+      <FilmStickyHeader
+        title={film.title}
+        meta={[film.year, meta].filter(Boolean).join(" · ")}
+        rating={currentRated?.rating ?? null}
+      />
       <div className="w-40 shrink-0 sm:w-52">
         <PosterImg
           posterPath={film.posterPath}
@@ -111,17 +121,23 @@ export default async function FilmPage(ctx: {
           {timelinePoints.length >= 2 && <RewatchTimeline points={timelinePoints} />}
           {user ? (
             <FilmPanel
-              filmId={film.id}
+              film={{
+                id: film.id,
+                title: film.title,
+                year: film.year,
+                director: film.director,
+                posterPath: film.posterPath,
+              }}
               entries={entries.map((e) => ({
                 id: e.id,
                 watchedOn: e.watchedOn,
                 rating: e.rating,
                 rewatch: e.rewatch,
-                hasReview: Boolean(e.review),
+                review: e.review,
+                spoiler: e.spoiler,
+                private: e.private,
                 createdAt: e.createdAt.toISOString(),
               }))}
-              currentRatedEntryId={currentRated?.id ?? null}
-              currentRating={currentRated?.rating ?? null}
               inWatchlist={Boolean(wlRow)}
               watchlistSource={wlRow?.source ?? null}
               lists={editableLists}

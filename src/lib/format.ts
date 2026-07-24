@@ -22,6 +22,18 @@ export function todayLocalISO(d: Date = new Date()): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/**
+ * Ratings carry one accent: gold for the 9.0+ shelf. Everything below reads as
+ * plain text, so the eye finds a personal favourite without the whole column
+ * turning into a heat map.
+ */
+export function ratingColor(tenths: number | null): string {
+  if (tenths === null) return "text-ash";
+  if (tenths >= 90) return "text-gold";
+  if (tenths >= 70) return "text-paper";
+  return "text-ash";
+}
+
 export const RATING_ANCHORS: { range: string; meaning: string }[] = [
   { range: "9.0–10.0", meaning: "Exceptional: a personal favourite" },
   { range: "8.0–8.9", meaning: "Great" },

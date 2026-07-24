@@ -134,10 +134,33 @@ export const watchlist = pgTable(
       .references(() => films.id),
     // capture reason: who recommended it or where you saw it
     source: text("source"),
+    // how much you want to get to it; drives the coloured dot in the queue
+    priority: text("priority").$type<"urgent" | "soon" | "whenever">().notNull().default("whenever"),
+    // manual queue order; lower sorts first, fractional so a drag needs one write
+    position: doublePrecision("position").notNull().default(0),
     importId: uuid("import_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("watchlist_user_film_uq").on(t.userId, t.filmId)],
+);
+
+/**
+ * A favourite is a separate signal from a rating: a 7.2 you'd rewatch tonight
+ * belongs here, a technically-perfect 9.1 you never revisit does not.
+ */
+export const favourites = pgTable(
+  "favourites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    filmId: uuid("film_id")
+      .notNull()
+      .references(() => films.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("favourites_user_film_uq").on(t.userId, t.filmId)],
 );
 
 /** Mutual friendship, one row per pair; ids stored low/high so the pair is unique. */
@@ -253,6 +276,8 @@ export const listItems = pgTable(
       .references(() => films.id),
     addedBy: uuid("added_by").references(() => users.id, { onDelete: "set null" }),
     position: doublePrecision("position").notNull().default(0),
+    // why this film is on the list, written by whoever added it
+    note: text("note"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("list_items_uq").on(t.listId, t.filmId)],

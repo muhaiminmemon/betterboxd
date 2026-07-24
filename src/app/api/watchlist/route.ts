@@ -28,6 +28,35 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true });
 }
 
+const patchSchema = z.object({
+  filmId: z.string().uuid(),
+  priority: z.enum(["urgent", "soon", "whenever"]).optional(),
+  source: z.string().max(200).nullable().optional(),
+});
+
+/** Change how much you want to get to something, without re-adding it. */
+export async function PATCH(req: Request) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  const parsed = patchSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Bad request." }, { status: 400 });
+
+  const { filmId, ...changes } = parsed.data;
+  if (Object.values(changes).every((v) => v === undefined)) {
+    return NextResponse.json({ error: "Nothing to change." }, { status: 400 });
+  }
+
+  const updated = await db
+    .update(watchlist)
+    .set(changes)
+    .where(and(eq(watchlist.userId, user.id), eq(watchlist.filmId, filmId)))
+    .returning({ id: watchlist.id });
+  if (!updated[0]) return NextResponse.json({ error: "Not on your watchlist." }, { status: 404 });
+
+  return NextResponse.json({ ok: true });
+}
+
 const removeSchema = z.object({ filmId: z.string().uuid() });
 
 export async function DELETE(req: Request) {

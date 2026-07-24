@@ -29,8 +29,9 @@ export default function ProfileTabs({ films, diaryRows, watchlistRows, editable 
 
   return (
     <div>
+      {/* pills that scroll under a thumb on mobile, an underlined strip on desktop */}
       <div
-        className="mb-5 flex items-center gap-1 border-b border-seam text-sm"
+        className="mb-5 mt-6 flex snap-x items-center gap-1.5 overflow-x-auto pb-1 text-sm sm:gap-1 sm:overflow-visible sm:border-b sm:border-seam sm:pb-0"
         role="tablist"
         aria-label="Profile sections"
       >
@@ -41,13 +42,16 @@ export default function ProfileTabs({ films, diaryRows, watchlistRows, editable 
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`num -mb-px border-b-2 px-3 py-2 transition-colors ${
+            className={`num shrink-0 snap-start rounded-full border px-3.5 py-1.5 transition-colors sm:-mb-px sm:rounded-none sm:border-0 sm:border-b-2 sm:px-3 sm:py-2 ${
               tab === t.id
-                ? "border-paper text-paper"
-                : "border-transparent text-ash hover:text-paper"
+                ? "border-paper bg-paper text-carbon sm:bg-transparent sm:text-paper"
+                : "border-seam bg-tray text-ash hover:text-paper sm:border-transparent sm:bg-transparent"
             }`}
           >
-            {t.label} <span className="text-xs">{t.count}</span>
+            {t.label}{" "}
+            <span className={`text-xs ${tab === t.id ? "text-carbon/60 sm:text-ash" : "text-dim"}`}>
+              {t.count}
+            </span>
           </button>
         ))}
       </div>

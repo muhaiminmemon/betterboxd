@@ -10,6 +10,8 @@ import { areFriends, canViewProfile, isBlockedBetween } from "@/lib/social";
 import ProfileActions, { type Relationship } from "@/components/ProfileActions";
 import Avatar from "@/components/Avatar";
 import ProfileTabs from "@/components/ProfileTabs";
+import TasteCard from "@/components/TasteCard";
+import { getMutualLoves, getTasteProfile } from "@/lib/taste";
 
 export async function generateMetadata(ctx: { params: Promise<{ username: string }> }) {
   const { username } = await ctx.params;
@@ -86,6 +88,14 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
       ? formatTenths(Math.round(rated.reduce((s, f) => s + (f.rating ?? 0), 0) / rated.length))
       : null;
 
+  const taste = await getTasteProfile(profile.id, { includePrivate: isOwner });
+
+  // the compare snapshot only appears on someone else's profile
+  const viewerTaste =
+    viewer && !isOwner ? await getTasteProfile(viewer.id, { includePrivate: true }) : null;
+  const viewerMean = viewerTaste?.mean ?? null;
+  const mutual = viewer && !isOwner ? await getMutualLoves(viewer.id, profile.id) : [];
+
   const showDiary = isOwner || profile.showDiaryOnProfile;
   const showWatchlist = isOwner || profile.showWatchlistOnProfile;
 
@@ -159,6 +169,22 @@ export default async function ProfilePage(ctx: { params: Promise<{ username: str
             )
           )}
         </div>
+      </div>
+
+      <div className="mt-6">
+        <TasteCard
+          taste={taste}
+          compare={
+            viewer && !isOwner
+              ? {
+                  viewerMean,
+                  viewerName: "You",
+                  theirName: profile.displayName ?? profile.username,
+                  mutual,
+                }
+              : undefined
+          }
+        />
       </div>
 
       <ProfileTabs

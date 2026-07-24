@@ -13,6 +13,10 @@ export type LibraryFilm = {
   entryCount: number;
   lastWatched: string | null;
   sortKey: number;
+  /** a separate signal from the rating: one you'd put on again tonight */
+  favourite: boolean;
+  /** true when any viewing of it was logged as a rewatch */
+  rewatched: boolean;
 };
 
 /**
@@ -34,7 +38,11 @@ export async function getRankedLibrary(
       order by film_id, watched_on desc nulls last, created_at desc
     ),
     stats as (
-      select film_id, count(*)::int as entry_count, max(watched_on) as last_watched
+      select
+        film_id,
+        count(*)::int as entry_count,
+        max(watched_on) as last_watched,
+        bool_or(rewatch) as rewatched
       from diary_entries
       where user_id = ${userId} and ${privacyFilter}
       group by film_id
@@ -49,10 +57,13 @@ export async function getRankedLibrary(
       r.rating,
       s.entry_count,
       s.last_watched,
+      s.rewatched,
+      (fav.film_id is not null) as favourite,
       coalesce(o.sort_key, 0) as sort_key
     from stats s
     join films f on f.id = s.film_id
     left join rated r on r.film_id = s.film_id
+    left join favourites fav on fav.user_id = ${userId} and fav.film_id = s.film_id
     left join library_order o on o.user_id = ${userId} and o.film_id = s.film_id
     order by r.rating desc nulls last, coalesce(o.sort_key, 0) asc, f.title asc
   `);
@@ -68,6 +79,8 @@ export async function getRankedLibrary(
     entryCount: r.entry_count as number,
     lastWatched: r.last_watched as string | null,
     sortKey: r.sort_key as number,
+    favourite: Boolean(r.favourite),
+    rewatched: Boolean(r.rewatched),
   }));
 }
 

@@ -114,7 +114,7 @@ export async function POST(req: Request) {
         .values({
           userId: user.id,
           filmId,
-          watchedOn: null,
+          watchedOn: r.watchedOn,
           rating: r.rating,
           importId,
           sourceKey: sourceKey(r),
@@ -134,7 +134,7 @@ export async function POST(req: Request) {
         .values({
           userId: user.id,
           filmId,
-          watchedOn: null,
+          watchedOn: r.watchedOn,
           rating: null,
           importId,
           sourceKey: sourceKey(r),

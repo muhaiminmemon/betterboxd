@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { formatTenths } from "@/lib/format";
+import { formatTenths, ratingColor } from "@/lib/format";
 import { posterUrl } from "@/lib/tmdb-urls";
 import type { LibraryFilm } from "@/lib/library";
 
@@ -48,11 +48,23 @@ const SORT_LABELS: Record<SortMode, string> = {
   "most-watched": "Most watched",
 };
 
+/** One-tap slices of the collection, in place of a stack of dropdowns. */
+type SavedView = "all" | "great" | "favourites" | "thisYear" | "rewatched" | "unrated";
+
+const SAVED_VIEWS: { key: SavedView; label: string }[] = [
+  { key: "all", label: "Everything" },
+  { key: "great", label: "8.0+" },
+  { key: "favourites", label: "Favourites" },
+  { key: "thisYear", label: "This year" },
+  { key: "rewatched", label: "Rewatched" },
+  { key: "unrated", label: "No rating" },
+];
+
 export default function LibraryView({ films, editable }: Props) {
-  const [view, setView] = useState<"ledger" | "shelf">("ledger");
+  const [view, setView] = useState<"ledger" | "shelf">("shelf");
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortMode>("rating");
-  const [ratedOnly, setRatedOnly] = useState<"all" | "rated" | "unrated">("all");
+  const [saved, setSaved] = useState<SavedView>("all");
   const [items, setItems] = useState(films);
   const [prevFilms, setPrevFilms] = useState(films);
   if (films !== prevFilms) {
@@ -71,8 +83,12 @@ export default function LibraryView({ films, editable }: Props) {
           (x.director ?? "").toLowerCase().includes(q),
       );
     }
-    if (ratedOnly === "rated") out = out.filter((x) => x.rating !== null);
-    if (ratedOnly === "unrated") out = out.filter((x) => x.rating === null);
+    const thisYear = String(new Date().getFullYear());
+    if (saved === "great") out = out.filter((x) => x.rating !== null && x.rating >= 80);
+    if (saved === "favourites") out = out.filter((x) => x.favourite);
+    if (saved === "thisYear") out = out.filter((x) => x.lastWatched?.startsWith(thisYear));
+    if (saved === "rewatched") out = out.filter((x) => x.rewatched);
+    if (saved === "unrated") out = out.filter((x) => x.rating === null);
 
     if (sort !== "rating") {
       out = [...out].sort((a, b) => {
@@ -95,13 +111,63 @@ export default function LibraryView({ films, editable }: Props) {
       });
     }
     return out;
-  }, [items, filter, ratedOnly, sort]);
+  }, [items, filter, saved, sort]);
 
   // manual tie-reorder only makes sense in the default ranking with nothing hidden
-  const dragEnabled = editable && sort === "rating" && !filter && ratedOnly === "all";
+  const dragEnabled = editable && sort === "rating" && !filter && saved === "all";
+
+  /** Optimistic favourite toggle; the server call follows. */
+  async function toggleFavourite(filmId: string, next: boolean) {
+    setItems((list) =>
+      list.map((f) => (f.filmId === filmId ? { ...f, favourite: next } : f)),
+    );
+    await fetch("/api/favourites", {
+      method: next ? "POST" : "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filmId }),
+    }).catch(() => {
+      setItems((list) =>
+        list.map((f) => (f.filmId === filmId ? { ...f, favourite: !next } : f)),
+      );
+    });
+  }
+
+  const counts = useMemo(() => {
+    const thisYear = String(new Date().getFullYear());
+    return {
+      all: items.length,
+      great: items.filter((x) => x.rating !== null && x.rating >= 80).length,
+      favourites: items.filter((x) => x.favourite).length,
+      thisYear: items.filter((x) => x.lastWatched?.startsWith(thisYear)).length,
+      rewatched: items.filter((x) => x.rewatched).length,
+      unrated: items.filter((x) => x.rating === null).length,
+    } satisfies Record<SavedView, number>;
+  }, [items]);
 
   return (
     <div>
+      {/* saved views: the slices you actually reach for */}
+      <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Saved views">
+        {SAVED_VIEWS.map((v) => (
+          <button
+            key={v.key}
+            type="button"
+            aria-pressed={saved === v.key}
+            onClick={() => setSaved(v.key)}
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition-colors ${
+              saved === v.key
+                ? "border-paper bg-paper text-carbon"
+                : "border-seam bg-tray text-ash hover:text-paper"
+            }`}
+          >
+            {v.label}
+            <span className={`num text-[11px] ${saved === v.key ? "text-carbon/60" : "text-dim"}`}>
+              {counts[v.key]}
+            </span>
+          </button>
+        ))}
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input
           type="search"
@@ -109,7 +175,7 @@ export default function LibraryView({ films, editable }: Props) {
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter title or director"
           aria-label="Filter library"
-          className="w-48 rounded-card border border-seam bg-tray px-3 py-1.5 text-sm placeholder:text-ash focus:border-beam focus:outline-none"
+          className="w-48 rounded-card border border-seam bg-tray px-3 py-1.5 text-sm placeholder:text-dim focus:border-beam focus:outline-none"
         />
         <select
           value={sort}
@@ -123,18 +189,17 @@ export default function LibraryView({ films, editable }: Props) {
             </option>
           ))}
         </select>
-        <select
-          value={ratedOnly}
-          onChange={(e) => setRatedOnly(e.target.value as typeof ratedOnly)}
-          aria-label="Rated filter"
-          className="rounded-card border border-seam bg-tray px-2 py-1.5 text-sm text-paper"
-        >
-          <option value="all">Rated & unrated</option>
-          <option value="rated">Rated only</option>
-          <option value="unrated">No rating yet</option>
-        </select>
+        {filter && (
+          <button
+            type="button"
+            onClick={() => setFilter("")}
+            className="text-xs text-ash hover:text-paper"
+          >
+            Clear filter
+          </button>
+        )}
         <div className="ml-auto flex rounded-card border border-seam text-sm" role="group" aria-label="View">
-          {(["ledger", "shelf"] as const).map((v) => (
+          {(["shelf", "ledger"] as const).map((v) => (
             <button
               key={v}
               type="button"
@@ -151,7 +216,11 @@ export default function LibraryView({ films, editable }: Props) {
       </div>
 
       {visible.length === 0 ? (
-        <p className="py-8 text-sm text-ash">No films match those filters.</p>
+        <p className="py-8 text-sm text-ash">
+          {saved === "favourites"
+            ? "No favourites yet. Tap the star on a poster to mark one."
+            : "No films match those filters."}
+        </p>
       ) : view === "ledger" ? (
         dragEnabled ? (
           <RankedLedger films={visible} onReorder={setItems} all={items} />
@@ -159,7 +228,7 @@ export default function LibraryView({ films, editable }: Props) {
           <FlatLedger films={visible} showRank={sort === "rating"} />
         )
       ) : (
-        <Shelf films={visible} />
+        <Shelf films={visible} editable={editable} onToggleFavourite={toggleFavourite} />
       )}
     </div>
   );
@@ -314,6 +383,11 @@ function LedgerRow({
       <span className="min-w-0 flex-1">
         <Link href={`/film/${film.slug}`} className="block truncate text-paper hover:underline">
           {film.title}
+          {film.favourite && (
+            <span className="ml-1.5 text-gold" title="Favourite" aria-label="Favourite">
+              ★
+            </span>
+          )}
         </Link>
         <span className="block truncate text-xs text-ash">
           {[film.year, film.director].filter(Boolean).join(" · ")}
@@ -331,20 +405,28 @@ function LedgerRow({
           ⠿
         </button>
       )}
-      <span className="num w-12 shrink-0 text-right text-lg text-paper">
+      <span className={`num w-12 shrink-0 text-right text-lg ${ratingColor(film.rating)}`}>
         {film.rating !== null ? formatTenths(film.rating) : ""}
       </span>
     </li>
   );
 }
 
-function Shelf({ films }: { films: LibraryFilm[] }) {
+function Shelf({
+  films,
+  editable,
+  onToggleFavourite,
+}: {
+  films: LibraryFilm[];
+  editable: boolean;
+  onToggleFavourite: (filmId: string, next: boolean) => void;
+}) {
   return (
     <ul className="fade-up grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
       {films.map((film) => {
         const poster = posterUrl(film.posterPath, "w342");
         return (
-          <li key={film.filmId}>
+          <li key={film.filmId} className="group relative">
             <Link href={`/film/${film.slug}`} className="block">
               {poster ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -352,7 +434,7 @@ function Shelf({ films }: { films: LibraryFilm[] }) {
                   src={poster}
                   alt={`Poster for ${film.title}`}
                   loading="lazy"
-                  className="aspect-[2/3] w-full rounded-card object-cover bg-tray"
+                  className="aspect-[2/3] w-full rounded-card bg-tray object-cover"
                 />
               ) : (
                 <span className="flex aspect-[2/3] w-full items-center justify-center rounded-card bg-tray p-2 text-center text-sm text-ash">
@@ -361,11 +443,31 @@ function Shelf({ films }: { films: LibraryFilm[] }) {
               )}
               <span className="mt-1.5 flex items-baseline justify-between gap-2">
                 <span className="truncate text-xs text-ash">{film.title}</span>
-                <span className="num text-sm text-paper">
+                <span className={`num text-sm ${ratingColor(film.rating)}`}>
                   {film.rating !== null ? formatTenths(film.rating) : ""}
                 </span>
               </span>
             </Link>
+            {editable && (
+              <button
+                type="button"
+                onClick={() => onToggleFavourite(film.filmId, !film.favourite)}
+                aria-pressed={film.favourite}
+                aria-label={
+                  film.favourite
+                    ? `Remove ${film.title} from favourites`
+                    : `Mark ${film.title} as a favourite`
+                }
+                // always visible once set, otherwise revealed on hover/focus
+                className={`absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-[rgba(8,8,10,.7)] text-sm backdrop-blur transition-opacity ${
+                  film.favourite
+                    ? "text-gold opacity-100"
+                    : "text-paper opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                }`}
+              >
+                {film.favourite ? "★" : "☆"}
+              </button>
+            )}
           </li>
         );
       })}

@@ -2,13 +2,19 @@
 
 @theme inline {
   /* projection-room graphite: chrome stays quiet, posters carry the color */
+  --color-void: #0e0e10;
   --color-carbon: #141417;
+  --color-lift: #16161a;
   --color-tray: #1c1c21;
   --color-tray-2: #232329;
   --color-seam: #2a2a31;
   --color-paper: #eceae6;
   --color-ash: #9a9aa3;
+  --color-dim: #6a6a72;
   --color-beam: #8faecc;
+  --color-beam-edge: #34506a;
+  --color-gold: #d9b25f;
+  --color-good: #8fbf7f;
   --color-warn: #c4756a;
 
   --font-display: var(--font-space-grotesk), sans-serif;
@@ -24,7 +30,7 @@ html {
 }
 
 body {
-  background: #141417;
+  background: #0e0e10;
   color: #eceae6;
   font-family: var(--font-plex), sans-serif;
   font-size: 15px;
@@ -72,8 +78,70 @@ body {
   animation: fade-up 0.35s ease-out both;
 }
 
+/* the scrim behind a sheet */
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* desktop: the panel slides in from the right edge */
+@keyframes slide-over-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* mobile: the same panel rises from the bottom */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.scrim-in {
+  animation: scrim-in 0.2s ease-out both;
+}
+
+.sheet-in {
+  animation: sheet-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@media (min-width: 640px) {
+  .sheet-in {
+    animation-name: slide-over-in;
+  }
+}
+
+.toast-in {
+  animation: toast-in 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .fade-up {
+  .fade-up,
+  .scrim-in,
+  .sheet-in,
+  .toast-in {
     animation: none;
   }
   * {
